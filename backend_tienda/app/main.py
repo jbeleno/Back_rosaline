@@ -1,9 +1,33 @@
 from fastapi import FastAPI, Depends, HTTPException, Body
+# Name: fastapi (FastAPI, Depends, HTTPException, Body)
+# Nombre: fastapi (FastAPI, Depends, HTTPException, Body)
+# Description: Main FastAPI framework classes and utilities for building APIs.
+# Descripción: Clases principales y utilidades del framework FastAPI para construir APIs.
 from sqlalchemy.orm import Session
+# Name: sqlalchemy.orm (Session)
+# Nombre: sqlalchemy.orm (Session)
+# Description: Provides ORM session for database operations.
+# Descripción: Proporciona la sesión ORM para operaciones con la base de datos.
 from fastapi.middleware.cors import CORSMiddleware
+# Name: fastapi.middleware.cors (CORSMiddleware)
+# Nombre: fastapi.middleware.cors (CORSMiddleware)
+# Description: Middleware to enable Cross-Origin Resource Sharing (CORS).
+# Descripción: Middleware para habilitar el intercambio de recursos de origen cruzado (CORS).
 from . import models, schemas, crud
+# Name: Local imports (models, schemas, crud)
+# Nombre: Importaciones locales (models, schemas, crud)
+# Description: Imports local modules for models, schemas, and CRUD operations.
+# Descripción: Importa módulos locales para modelos, esquemas y operaciones CRUD.
 from .database import SessionLocal, engine
+# Name: Local import (SessionLocal, engine)
+# Nombre: Importación local (SessionLocal, engine)
+# Description: Imports the database session and engine for database operations.
+# Descripción: Importa la sesión y el motor de la base de datos para operaciones.
 from .auth import crear_token_de_acceso, get_current_user, verify_password
+# Name: Local import (crear_token_de_acceso, get_current_user, verify_password)
+# Nombre: Importación local (crear_token_de_acceso, get_current_user, verify_password)
+# Description: Imports authentication utilities for token creation and user verification.
+# Descripción: Importa utilidades de autenticación para creación de tokens y verificación de usuarios.
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -24,9 +48,18 @@ def get_db():
     finally:
         db.close()
 
+# Name: FastAPI Application Entry Point
+# Nombre: Punto de Entrada de la Aplicación FastAPI
+# Description: Defines the FastAPI app, routes, and dependency injection for the backend API.
+# Descripción: Define la aplicación FastAPI, las rutas y la inyección de dependencias para la API del backend.
+
 # Usuarios
 @app.post("/usuarios/", response_model=schemas.Usuario)
 def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
+    # Name: Create User Endpoint
+    # Nombre: Endpoint para Crear Usuario
+    # Description: API endpoint to create a new user.
+    # Descripción: Endpoint de la API para crear un nuevo usuario.
     db_usuario = crud.get_usuario_por_correo(db, correo=usuario.correo)
     if db_usuario:
         raise HTTPException(status_code=400, detail="Correo ya registrado")

@@ -1,15 +1,48 @@
 from sqlalchemy.orm import Session
+# Name: sqlalchemy.orm (Session)
+# Nombre: sqlalchemy.orm (Session)
+# Description: Provides ORM session for database operations.
+# Descripción: Proporciona la sesión ORM para operaciones con la base de datos.
 from . import models, schemas
+# Name: Local imports (models, schemas)
+# Nombre: Importaciones locales (models, schemas)
+# Description: Imports local modules for database models and data schemas.
+# Descripción: Importa módulos locales para modelos de base de datos y esquemas de datos.
 from datetime import datetime
+# Name: datetime
+# Nombre: datetime
+# Description: Provides date and time manipulation utilities.
+# Descripción: Proporciona utilidades para manipulación de fechas y horas.
 from .auth import hash_password
+# Name: Local import (hash_password)
+# Nombre: Importación local (hash_password)
+# Description: Imports the password hashing function from the authentication module.
+# Descripción: Importa la función de hasheo de contraseñas del módulo de autenticación.
+
+# Name: CRUD Operations
+# Nombre: Operaciones CRUD
+# Description: Functions to create, read, update, and delete database records for users, clients, categories, products, orders, carts, etc.
+# Descripción: Funciones para crear, leer, actualizar y eliminar registros de la base de datos para usuarios, clientes, categorías, productos, pedidos, carritos, etc.
 
 def get_usuario(db: Session, usuario_id: int):
+    # Name: Get User by ID
+    # Nombre: Obtener Usuario por ID
+    # Description: Retrieves a user from the database by their ID.
+    # Descripción: Recupera un usuario de la base de datos por su ID.
     return db.query(models.Usuario).filter(models.Usuario.id_usuario == usuario_id).first()
 
 def get_usuario_por_correo(db: Session, correo: str):
+    # Name: Get User by Email
+    # Nombre: Obtener Usuario por Correo
+    # Description: Retrieves a user from the database by their email address.
+    # Descripción: Recupera un usuario de la base de datos por su correo electrónico.
     return db.query(models.Usuario).filter(models.Usuario.correo == correo).first()
 
 def crear_usuario(db: Session, usuario: schemas.UsuarioCreate):
+    # Name: Create User
+    # Nombre: Crear Usuario
+    # Description: Creates a new user in the database with hashed password.
+    # Descripción: Crea un nuevo usuario en la base de datos con contraseña hasheada.
     db_usuario = models.Usuario(
         correo=usuario.correo,
         contraseña=hash_password(usuario.contraseña),

@@ -1,92 +1,104 @@
-# Backend Tienda
+# Store Backend
 
-Este es un backend desarrollado con **FastAPI** para la gestión de una tienda en línea. Permite la administración de usuarios, clientes, productos, categorías, pedidos y carritos de compra, integrando autenticación y conexión a base de datos PostgreSQL.
+This is a backend developed with **FastAPI** for managing an online store. It allows the administration of users, clients, products, categories, orders, and shopping carts, integrating authentication and connection to a PostgreSQL database.
 
-## Características principales
+## Main Features
 
-- **Usuarios**: Registro, edición, eliminación y autenticación.
-- **Clientes**: Gestión completa de clientes.
-- **Productos y Categorías**: CRUD de productos y categorías.
-- **Pedidos y Detalles**: Gestión de pedidos y sus detalles.
-- **Carrito de compras**: Operaciones sobre carritos y productos en el carrito.
-- **Autenticación JWT**: Inicio de sesión seguro.
-- **CORS habilitado**: Permite peticiones desde cualquier origen (útil para desarrollo).
+- **Users**: Registration, editing, deletion, and authentication.
+- **Clients**: Full client management.
+- **Products and Categories**: CRUD for products and categories.
+- **Orders and Details**: Management of orders and their details.
+- **Shopping Cart**: Operations on carts and products in the cart.
+- **JWT Authentication**: Secure login.
+- **CORS enabled**: Allows requests from any origin (useful for development).
 
-## Estructura del proyecto
+## Project Structure
 
 ```
 backend_tienda/
 │
 ├── app/
-│   ├── main.py           # Puntos de entrada y rutas de la API
-│   ├── models.py         # Modelos de SQLAlchemy
-│   ├── schemas.py        # Esquemas de Pydantic
-│   ├── crud.py           # Operaciones CRUD
-│   ├── database.py       # Configuración de la base de datos
-│   ├── auth.py           # Autenticación y seguridad
+│   ├── main.py           # API entry point and routes
+│   ├── models.py         # SQLAlchemy models
+│   ├── schemas.py        # Pydantic schemas
+│   ├── crud.py           # CRUD operations
+│   ├── database.py       # Database configuration
+│   ├── auth.py           # Authentication and security
 │   └── __init__.py
-├── requirements.txt      # Dependencias del proyecto
-└── Procfile              # Para despliegue en plataformas como Heroku
+├── requirements.txt      # Project dependencies
+└── Procfile              # For deployment on platforms like Heroku
 ```
 
-## Instalación
+## Installation
 
-1. **Clona el repositorio:**
+1. **Clone the repository:**
    ```bash
-   git clone <URL_DEL_REPO>
+   git clone <REPO_URL>
    cd backend_tienda
    ```
 
-2. **Crea un entorno virtual (opcional pero recomendado):**
+2. **Create a virtual environment (optional but recommended):**
    ```bash
    python -m venv venv
-   source venv/bin/activate  # En Windows: venv\Scripts\activate
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. **Instala las dependencias:**
+3. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
 
-## Configuración
+## Configuration
 
-La conexión a la base de datos está definida en `app/database.py`. Por defecto, utiliza PostgreSQL en Supabase:
+The database connection is defined in `app/database.py`. By default, it uses PostgreSQL on Supabase:
 
 ```python
-SQLALCHEMY_DATABASE_URL = "postgresql://<usuario>:<contraseña>@<host>:<puerto>/<db>"
+SQLALCHEMY_DATABASE_URL = "postgresql://<user>:<password>@<host>:<port>/<db>"
 ```
 
-Modifica esta URL si necesitas conectar a otra base de datos.
+Modify this URL if you need to connect to another database.
 
-## Ejecución
+## Running
 
-Para iniciar el servidor de desarrollo:
+To start the development server:
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-La API estará disponible en: [http://localhost:8000](http://localhost:8000)
+The API will be available at: [http://localhost:8000](http://localhost:8000)
 
-## Endpoints principales
+## Main Endpoints
 
-Algunos endpoints disponibles:
+Some available endpoints:
 
-- `POST /usuarios/` - Crear usuario
-- `POST /login` - Iniciar sesión
-- `GET /clientes/` - Listar clientes
-- `POST /productos/` - Crear producto
-- `GET /productos/` - Listar productos
-- `POST /pedidos/` - Crear pedido
-- `GET /pedidos/` - Listar pedidos
-- ...y muchos más para CRUD de cada entidad
+- `POST /usuarios/` - Create user
+- `POST /login` - Login
+- `GET /clientes/` - List clients
+- `POST /productos/` - Create product
+- `GET /productos/` - List products
+- `POST /pedidos/` - Create order
+- `GET /pedidos/` - List orders
+- ...and many more for CRUD of each entity
 
-La documentación interactiva de la API está disponible en [http://localhost:8000/docs](http://localhost:8000/docs) gracias a Swagger.
+The interactive API documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs) thanks to Swagger.
 
-## Despliegue
+## Deployment
 
-Incluye un `Procfile` para despliegue en plataformas como Heroku.
+Includes a `Procfile` for deployment on platforms like Heroku.
 
-## Licencia
+## License
 
-Este proyecto está bajo la licencia MIT.
+This project is under the MIT license.
+
+## Used Libraries
+
+- **FastAPI**: Web framework for building APIs.
+- **SQLAlchemy**: ORM for database management.
+- **Pydantic**: Data validation and serialization.
+- **Uvicorn**: ASGI server for running FastAPI.
+- **python-jose**: JWT token encoding and decoding.
+- **passlib**: Password hashing utilities.
+- **psycopg2**: PostgreSQL database adapter.
+- **python-dotenv**: Environment variable management (if used).
+- **CORS Middleware**: For handling cross-origin requests.

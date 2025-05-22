@@ -1,8 +1,29 @@
 from sqlalchemy import Column, Integer, String, Text, Numeric, ForeignKey, TIMESTAMP, Computed
+# Name: sqlalchemy (Column, Integer, String, Text, Numeric, ForeignKey, TIMESTAMP, Computed)
+# Nombre: sqlalchemy (Column, Integer, String, Text, Numeric, ForeignKey, TIMESTAMP, Computed)
+# Description: Provides SQLAlchemy column types and constraints for ORM models.
+# Descripción: Proporciona tipos de columna y restricciones de SQLAlchemy para modelos ORM.
 from sqlalchemy.orm import relationship
+# Name: sqlalchemy.orm (relationship)
+# Nombre: sqlalchemy.orm (relationship)
+# Description: Defines relationships between ORM models (tables).
+# Descripción: Define relaciones entre modelos ORM (tablas).
 from .database import Base
+# Name: Local import (Base)
+# Nombre: Importación local (Base)
+# Description: Imports the declarative base for SQLAlchemy models.
+# Descripción: Importa la base declarativa para los modelos de SQLAlchemy.
+
+# Name: SQLAlchemy Models
+# Nombre: Modelos de SQLAlchemy
+# Description: Database table definitions using SQLAlchemy ORM for users, clients, categories, products, orders, carts, etc.
+# Descripción: Definiciones de tablas de la base de datos usando SQLAlchemy ORM para usuarios, clientes, categorías, productos, pedidos, carritos, etc.
 
 class Usuario(Base):
+    # Name: User Model
+    # Nombre: Modelo de Usuario
+    # Description: Represents the users table in the database.
+    # Descripción: Representa la tabla de usuarios en la base de datos.
     __tablename__ = "usuarios"
     id_usuario = Column(Integer, primary_key=True, index=True)
     correo = Column(String(255), unique=True, nullable=False)
@@ -11,6 +32,10 @@ class Usuario(Base):
     fecha_creacion = Column(TIMESTAMP, nullable=False)
 
 class Cliente(Base):
+    # Name: Client Model
+    # Nombre: Modelo de Cliente
+    # Description: Represents the clients table in the database.
+    # Descripción: Representa la tabla de clientes en la base de datos.
     __tablename__ = "clientes"
     id_cliente = Column(Integer, primary_key=True, index=True)
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False)
