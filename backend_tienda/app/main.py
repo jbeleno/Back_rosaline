@@ -1,33 +1,18 @@
+"""
+FastAPI application entry point.
+
+- Defines the application, routes, and dependency injection for the backend API.
+- Configures CORS and the database connection.
+- Main dependencies: FastAPI, SQLAlchemy, local modules (models, schemas, crud, auth, database)
+"""
+
 from fastapi import FastAPI, Depends, HTTPException, Body
-# Name: fastapi (FastAPI, Depends, HTTPException, Body)
-# Nombre: fastapi (FastAPI, Depends, HTTPException, Body)
-# Description: Main FastAPI framework classes and utilities for building APIs.
-# Descripción: Clases principales y utilidades del framework FastAPI para construir APIs.
 from sqlalchemy.orm import Session
-# Name: sqlalchemy.orm (Session)
-# Nombre: sqlalchemy.orm (Session)
-# Description: Provides ORM session for database operations.
-# Descripción: Proporciona la sesión ORM para operaciones con la base de datos.
 from fastapi.middleware.cors import CORSMiddleware
-# Name: fastapi.middleware.cors (CORSMiddleware)
-# Nombre: fastapi.middleware.cors (CORSMiddleware)
-# Description: Middleware to enable Cross-Origin Resource Sharing (CORS).
-# Descripción: Middleware para habilitar el intercambio de recursos de origen cruzado (CORS).
 from . import models, schemas, crud
-# Name: Local imports (models, schemas, crud)
-# Nombre: Importaciones locales (models, schemas, crud)
-# Description: Imports local modules for models, schemas, and CRUD operations.
-# Descripción: Importa módulos locales para modelos, esquemas y operaciones CRUD.
 from .database import SessionLocal, engine
-# Name: Local import (SessionLocal, engine)
-# Nombre: Importación local (SessionLocal, engine)
-# Description: Imports the database session and engine for database operations.
-# Descripción: Importa la sesión y el motor de la base de datos para operaciones.
 from .auth import crear_token_de_acceso, get_current_user, verify_password
-# Name: Local import (crear_token_de_acceso, get_current_user, verify_password)
-# Nombre: Importación local (crear_token_de_acceso, get_current_user, verify_password)
-# Description: Imports authentication utilities for token creation and user verification.
-# Descripción: Importa utilidades de autenticación para creación de tokens y verificación de usuarios.
+
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -48,24 +33,13 @@ def get_db():
     finally:
         db.close()
 
-# Name: FastAPI Application Entry Point
-# Nombre: Punto de Entrada de la Aplicación FastAPI
-# Description: Defines the FastAPI app, routes, and dependency injection for the backend API.
-# Descripción: Define la aplicación FastAPI, las rutas y la inyección de dependencias para la API del backend.
-
-# Usuarios
 @app.post("/usuarios/", response_model=schemas.Usuario)
 def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
-    # Name: Create User Endpoint
-    # Nombre: Endpoint para Crear Usuario
-    # Description: API endpoint to create a new user.
-    # Descripción: Endpoint de la API para crear un nuevo usuario.
     db_usuario = crud.get_usuario_por_correo(db, correo=usuario.correo)
     if db_usuario:
         raise HTTPException(status_code=400, detail="Correo ya registrado")
     return crud.crear_usuario(db=db, usuario=usuario)
 
-# Clientes
 @app.post("/clientes/", response_model=schemas.Cliente)
 def crear_cliente(cliente: schemas.ClienteCreate, db: Session = Depends(get_db)):
     return crud.crear_cliente(db=db, cliente=cliente)
@@ -81,7 +55,6 @@ def obtener_cliente_por_usuario(id_usuario: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     return cliente
 
-# Categorías
 @app.post("/categorias/", response_model=schemas.Categoria)
 def crear_categoria(categoria: schemas.CategoriaCreate, db: Session = Depends(get_db)):
     return crud.crear_categoria(db=db, categoria=categoria)
@@ -90,7 +63,6 @@ def crear_categoria(categoria: schemas.CategoriaCreate, db: Session = Depends(ge
 def listar_categorias(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_categorias(db, skip=skip, limit=limit)
 
-# Productos
 @app.post("/productos/", response_model=schemas.Producto)
 def crear_producto(producto: schemas.ProductoCreate, db: Session = Depends(get_db)):
     return crud.crear_producto(db=db, producto=producto)
@@ -99,7 +71,6 @@ def crear_producto(producto: schemas.ProductoCreate, db: Session = Depends(get_d
 def listar_productos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_productos(db, skip=skip, limit=limit)
 
-# Pedidos
 @app.post("/pedidos/", response_model=schemas.Pedido)
 def crear_pedido(pedido: schemas.PedidoCreate, db: Session = Depends(get_db)):
     return crud.crear_pedido(db=db, pedido=pedido)
@@ -108,7 +79,6 @@ def crear_pedido(pedido: schemas.PedidoCreate, db: Session = Depends(get_db)):
 def listar_pedidos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_pedidos(db, skip=skip, limit=limit)
 
-# Detalle de pedidos
 @app.post("/detalle_pedidos/", response_model=schemas.DetallePedido)
 def crear_detalle_pedido(detalle: schemas.DetallePedidoCreate, db: Session = Depends(get_db)):
     return crud.crear_detalle_pedido(db=db, detalle=detalle)
@@ -117,7 +87,6 @@ def crear_detalle_pedido(detalle: schemas.DetallePedidoCreate, db: Session = Dep
 def listar_detalles_pedido(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_detalles_pedido(db, skip=skip, limit=limit)
 
-# Usuarios - Editar y Eliminar
 @app.put("/usuarios/{usuario_id}", response_model=schemas.Usuario)
 def actualizar_usuario(usuario_id: int, usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
     db_usuario = crud.actualizar_usuario(db, usuario_id, usuario)
@@ -132,7 +101,6 @@ def eliminar_usuario(usuario_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return db_usuario
 
-# Clientes - Editar y Eliminar
 @app.put("/clientes/{cliente_id}", response_model=schemas.Cliente)
 def actualizar_cliente(cliente_id: int, cliente: schemas.ClienteCreate, db: Session = Depends(get_db)):
     db_cliente = crud.actualizar_cliente(db, cliente_id, cliente)
@@ -147,7 +115,6 @@ def eliminar_cliente(cliente_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     return db_cliente
 
-# Categorías - Editar y Eliminar
 @app.put("/categorias/{categoria_id}", response_model=schemas.Categoria)
 def actualizar_categoria(categoria_id: int, categoria: schemas.CategoriaCreate, db: Session = Depends(get_db)):
     db_categoria = crud.actualizar_categoria(db, categoria_id, categoria)
@@ -162,7 +129,6 @@ def eliminar_categoria(categoria_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     return db_categoria
 
-# Productos - Editar y Eliminar
 @app.put("/productos/{producto_id}", response_model=schemas.Producto)
 def actualizar_producto(producto_id: int, producto: schemas.ProductoCreate, db: Session = Depends(get_db)):
     db_producto = crud.actualizar_producto(db, producto_id, producto)
@@ -177,7 +143,6 @@ def eliminar_producto(id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     return {"mensaje": "Producto eliminado correctamente"}
 
-# Pedidos - Editar y Eliminar
 @app.put("/pedidos/{pedido_id}", response_model=schemas.Pedido)
 def actualizar_pedido(pedido_id: int, pedido: schemas.PedidoCreate, db: Session = Depends(get_db)):
     db_pedido = crud.actualizar_pedido(db, pedido_id, pedido)
@@ -192,7 +157,6 @@ def eliminar_pedido(pedido_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     return db_pedido
 
-# Detalle de pedidos - Editar y Eliminar
 @app.put("/detalle_pedidos/{detalle_id}", response_model=schemas.DetallePedido)
 def actualizar_detalle_pedido(detalle_id: int, detalle: schemas.DetallePedidoCreate, db: Session = Depends(get_db)):
     db_detalle = crud.actualizar_detalle_pedido(db, detalle_id, detalle)
@@ -207,29 +171,24 @@ def eliminar_detalle_pedido(detalle_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Detalle de pedido no encontrado")
     return db_detalle
 
-# Buscar productos de un pedido
 @app.get("/pedidos/{pedido_id}/productos", response_model=list[schemas.Producto])
 def productos_de_pedido(pedido_id: int, db: Session = Depends(get_db)):
     detalles = db.query(models.DetallePedido).filter(models.DetallePedido.id_pedido == pedido_id).all()
     productos = [db.query(models.Producto).filter(models.Producto.id_producto == d.id_producto).first() for d in detalles]
     return productos
 
-# Buscar productos de una categoría
 @app.get("/categorias/{categoria_id}/productos", response_model=list[schemas.Producto])
 def productos_de_categoria(categoria_id: int, db: Session = Depends(get_db)):
     return db.query(models.Producto).filter(models.Producto.id_categoria == categoria_id).all()
 
-# Buscar pedidos de un cliente
 @app.get("/clientes/{cliente_id}/pedidos", response_model=list[schemas.Pedido])
 def pedidos_de_cliente(cliente_id: int, db: Session = Depends(get_db)):
     return db.query(models.Pedido).filter(models.Pedido.id_cliente == cliente_id).all()
 
-# Listar pedidos por estado
 @app.get("/pedidos/estado/{estado}", response_model=list[schemas.Pedido])
 def listar_pedidos_por_estado(estado: str, db: Session = Depends(get_db)):
     return db.query(models.Pedido).filter(models.Pedido.estado == estado).all()
 
-# Carrito
 @app.post("/carritos/", response_model=schemas.Carrito)
 def crear_carrito(carrito: schemas.CarritoCreate, db: Session = Depends(get_db)):
     return crud.crear_carrito(db=db, carrito=carrito)
@@ -252,7 +211,6 @@ def eliminar_carrito(carrito_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Carrito no encontrado")
     return db_carrito
 
-# Detalle Carrito
 @app.post("/detalle_carrito/", response_model=schemas.DetalleCarrito)
 def crear_detalle_carrito(detalle: schemas.DetalleCarritoCreate, db: Session = Depends(get_db)):
     return crud.crear_detalle_carrito(db=db, detalle=detalle)
@@ -275,12 +233,10 @@ def eliminar_detalle_carrito(detalle_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Detalle de carrito no encontrado")
     return {"mensaje": "Eliminado correctamente"}
 
-# Carritos de un cliente
 @app.get("/clientes/{cliente_id}/carritos", response_model=list[schemas.Carrito])
 def carritos_de_cliente(cliente_id: int, db: Session = Depends(get_db)):
     return db.query(models.Carrito).filter(models.Carrito.id_cliente == cliente_id).all()
 
-# Productos de un carrito
 @app.get("/carritos/{carrito_id}/productos", response_model=list[schemas.Producto])
 def productos_de_carrito(carrito_id: int, db: Session = Depends(get_db)):
     detalles = db.query(models.DetalleCarrito).filter(models.DetalleCarrito.id_carrito == carrito_id).all()

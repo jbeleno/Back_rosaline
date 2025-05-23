@@ -1,48 +1,58 @@
-from sqlalchemy.orm import Session
-# Name: sqlalchemy.orm (Session)
-# Nombre: sqlalchemy.orm (Session)
-# Description: Provides ORM session for database operations.
-# Descripción: Proporciona la sesión ORM para operaciones con la base de datos.
-from . import models, schemas
-# Name: Local imports (models, schemas)
-# Nombre: Importaciones locales (models, schemas)
-# Description: Imports local modules for database models and data schemas.
-# Descripción: Importa módulos locales para modelos de base de datos y esquemas de datos.
-from datetime import datetime
-# Name: datetime
-# Nombre: datetime
-# Description: Provides date and time manipulation utilities.
-# Descripción: Proporciona utilidades para manipulación de fechas y horas.
-from .auth import hash_password
-# Name: Local import (hash_password)
-# Nombre: Importación local (hash_password)
-# Description: Imports the password hashing function from the authentication module.
-# Descripción: Importa la función de hasheo de contraseñas del módulo de autenticación.
+"""
+CRUD operations module for the database.
 
-# Name: CRUD Operations
-# Nombre: Operaciones CRUD
-# Description: Functions to create, read, update, and delete database records for users, clients, categories, products, orders, carts, etc.
-# Descripción: Funciones para crear, leer, actualizar y eliminar registros de la base de datos para usuarios, clientes, categorías, productos, pedidos, carritos, etc.
+Includes functions to:
+- Create, read, update, and delete records for users, clients, categories, products, orders, carts, etc.
+
+Main dependencies:
+- SQLAlchemy
+- datetime
+- Local modules: models, schemas, auth
+"""
+
+from sqlalchemy.orm import Session
+from . import models, schemas
+from datetime import datetime
+from .auth import hash_password
+
 
 def get_usuario(db: Session, usuario_id: int):
-    # Name: Get User by ID
-    # Nombre: Obtener Usuario por ID
-    # Description: Retrieves a user from the database by their ID.
-    # Descripción: Recupera un usuario de la base de datos por su ID.
+    """
+    Retrieves a user from the database by their ID.
+
+    Args:
+        db (Session): Database session.
+        usuario_id (int): User ID.
+
+    Returns:
+        models.Usuario | None: Found user or None if not found.
+    """
     return db.query(models.Usuario).filter(models.Usuario.id_usuario == usuario_id).first()
 
 def get_usuario_por_correo(db: Session, correo: str):
-    # Name: Get User by Email
-    # Nombre: Obtener Usuario por Correo
-    # Description: Retrieves a user from the database by their email address.
-    # Descripción: Recupera un usuario de la base de datos por su correo electrónico.
+    """
+    Retrieves a user from the database by their email address.
+
+    Args:
+        db (Session): Database session.
+        correo (str): User email address.
+
+    Returns:
+        models.Usuario | None: Found user or None if not found.
+    """
     return db.query(models.Usuario).filter(models.Usuario.correo == correo).first()
 
 def crear_usuario(db: Session, usuario: schemas.UsuarioCreate):
-    # Name: Create User
-    # Nombre: Crear Usuario
-    # Description: Creates a new user in the database with hashed password.
-    # Descripción: Crea un nuevo usuario en la base de datos con contraseña hasheada.
+    """
+    Creates a new user in the database with a hashed password.
+
+    Args:
+        db (Session): Database session.
+        usuario (schemas.UsuarioCreate): User data to create.
+
+    Returns:
+        models.Usuario: Created user.
+    """
     db_usuario = models.Usuario(
         correo=usuario.correo,
         contraseña=hash_password(usuario.contraseña),
@@ -124,6 +134,10 @@ def get_detalles_pedido(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.DetallePedido).offset(skip).limit(limit).all()
 
 def crear_detalle_pedido(db: Session, detalle: schemas.DetallePedidoCreate):
+    """
+    Creates an order detail and deducts the corresponding product inventory.
+    Raises an exception if there is not enough inventory.
+    """
     subtotal = detalle.cantidad * detalle.precio_unitario
     db_detalle = models.DetallePedido(
         id_pedido=detalle.id_pedido,
@@ -132,13 +146,13 @@ def crear_detalle_pedido(db: Session, detalle: schemas.DetallePedidoCreate):
         precio_unitario=detalle.precio_unitario,
         subtotal=subtotal
     )
-    # Restar la cantidad al inventario del producto
+    # Deduct the quantity from the product inventory
     producto = db.query(models.Producto).filter(models.Producto.id_producto == detalle.id_producto).first()
     if producto:
         if producto.cantidad >= detalle.cantidad:
             producto.cantidad -= detalle.cantidad
         else:
-            raise Exception("No hay suficiente inventario para el producto: {}".format(producto.nombre))
+            raise Exception(f"Not enough inventory for product: {producto.nombre}")
     db.add(db_detalle)
     db.commit()
     db.refresh(db_detalle)

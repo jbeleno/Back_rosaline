@@ -1,37 +1,19 @@
-from pydantic import BaseModel
-# Name: pydantic (BaseModel)
-# Nombre: pydantic (BaseModel)
-# Description: Provides base class for data validation and serialization using Pydantic.
-# Descripción: Proporciona la clase base para validación y serialización de datos usando Pydantic.
-from typing import Optional
-# Name: typing (Optional)
-# Nombre: typing (Optional)
-# Description: Allows for optional (nullable) type hints in data models.
-# Descripción: Permite anotaciones de tipo opcionales (nulos) en los modelos de datos.
-from datetime import datetime
-# Name: datetime (datetime)
-# Nombre: datetime (datetime)
-# Description: Provides date and time manipulation utilities.
-# Descripción: Proporciona utilidades para manipulación de fechas y horas.
+"""
+Data validation and serialization schemas using Pydantic for the API.
 
-# Name: Pydantic Schemas
-# Nombre: Esquemas de Pydantic
-# Description: Data validation and serialization schemas for API requests and responses.
-# Descripción: Esquemas de validación y serialización de datos para solicitudes y respuestas de la API.
+Includes the models for user, client, category, product, order, cart, and their details.
+Main dependencies: Pydantic, typing, datetime
+"""
+
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
 
 class UsuarioBase(BaseModel):
-    # Name: User Base Schema
-    # Nombre: Esquema Base de Usuario
-    # Description: Base schema for user data used in API.
-    # Descripción: Esquema base para los datos de usuario usados en la API.
     correo: str
     rol: Optional[str] = "cliente"
 
 class UsuarioCreate(UsuarioBase):
-    # Name: User Create Schema
-    # Nombre: Esquema de Creación de Usuario
-    # Description: Schema for creating a new user.
-    # Descripción: Esquema para la creación de un nuevo usuario.
     contraseña: str
 
 class Usuario(UsuarioBase):
