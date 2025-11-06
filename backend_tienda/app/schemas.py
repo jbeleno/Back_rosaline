@@ -150,7 +150,7 @@ class AuditLog(AuditLogBase):
     datos_anteriores: Optional[dict] = None
     datos_nuevos: Optional[dict] = None
     cambios: Optional[dict] = None
-    metadata: Optional[dict] = None
+    metadatos_extra: Optional[dict] = None
     
     class Config:
         from_attributes = True

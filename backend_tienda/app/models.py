@@ -105,6 +105,6 @@ class AuditLog(Base):
     datos_nuevos = Column(JSONB, nullable=True)
     cambios = Column(JSONB, nullable=True)  # Solo campos que cambiaron
     fecha_accion = Column(TIMESTAMP, nullable=False, index=True)
-    metadata = Column(JSONB, nullable=True)  # Información adicional
+    metadatos_extra = Column("metadata", JSONB, nullable=True)  # Información adicional (nombre columna DB: metadata)
     
     usuario = relationship("Usuario", foreign_keys=[usuario_id])
