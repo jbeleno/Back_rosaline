@@ -49,6 +49,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def root():
+    """Endpoint raíz para verificar que el servidor está funcionando."""
+    return {
+        "status": "ok",
+        "message": "API funcionando correctamente",
+        "service": "backend-tienda",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
+@app.get("/health")
+def health_check():
+    """Endpoint de health check para monitoreo."""
+    return {
+        "status": "healthy",
+        "service": "backend-tienda"
+    }
+
 @app.middleware("http")
 async def audit_middleware(request: Request, call_next):
     """Middleware para capturar contexto de auditoría."""
