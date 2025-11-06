@@ -84,7 +84,7 @@ async def audit_middleware(request: Request, call_next):
     
     try:
         # Solo si el endpoint requiere autenticación
-        if request.url.path not in ["/login", "/usuarios/", "/docs", "/openapi.json", "/redoc"]:
+        if request.url.path not in ["/login", "/usuarios/", "/docs", "/openapi.json", "/redoc", "/", "/health"]:
             auth_header = request.headers.get("authorization")
             if auth_header:
                 token = auth_header.replace("Bearer ", "")
