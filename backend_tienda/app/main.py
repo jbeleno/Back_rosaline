@@ -21,7 +21,11 @@ from .audit import set_audit_context, clear_audit_context
 # Cargar variables de entorno
 load_dotenv()
 
-models.Base.metadata.create_all(bind=engine)
+# Crear tablas si no existen (útil para desarrollo, en producción usar migraciones)
+try:
+    models.Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Advertencia: No se pudieron crear las tablas automáticamente: {e}")
 
 # Importar audit para registrar los event listeners
 from . import audit  # noqa: F401
