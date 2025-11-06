@@ -6,6 +6,7 @@ Main dependency: SQLAlchemy
 """
 
 from sqlalchemy import Column, Integer, String, Text, Numeric, ForeignKey, TIMESTAMP, Computed
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -88,3 +89,22 @@ class DetalleCarrito(Base):
     subtotal = Column(Numeric(10, 2))
     carrito = relationship("Carrito")
     producto = relationship("Producto")
+
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+    
+    id_audit = Column(Integer, primary_key=True, index=True)
+    tabla_nombre = Column(String(100), nullable=False, index=True)
+    registro_id = Column(Integer, nullable=False, index=True)
+    accion = Column(String(10), nullable=False, index=True)  # INSERT, UPDATE, DELETE
+    usuario_id = Column(Integer, ForeignKey("usuarios.id_usuario"), index=True, nullable=True)
+    usuario_email = Column(String(255), nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    endpoint = Column(String(255), nullable=True)
+    datos_anteriores = Column(JSONB, nullable=True)
+    datos_nuevos = Column(JSONB, nullable=True)
+    cambios = Column(JSONB, nullable=True)  # Solo campos que cambiaron
+    fecha_accion = Column(TIMESTAMP, nullable=False, index=True)
+    metadata = Column(JSONB, nullable=True)  # Información adicional
+    
+    usuario = relationship("Usuario", foreign_keys=[usuario_id])

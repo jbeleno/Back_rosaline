@@ -134,3 +134,23 @@ class DetalleCarrito(DetalleCarritoBase):
     producto: Producto
     class Config:
         from_attributes = True
+
+class AuditLogBase(BaseModel):
+    tabla_nombre: str
+    registro_id: int
+    accion: str
+    usuario_id: Optional[int] = None
+    usuario_email: Optional[str] = None
+    ip_address: Optional[str] = None
+    endpoint: Optional[str] = None
+    fecha_accion: datetime
+
+class AuditLog(AuditLogBase):
+    id_audit: int
+    datos_anteriores: Optional[dict] = None
+    datos_nuevos: Optional[dict] = None
+    cambios: Optional[dict] = None
+    metadata: Optional[dict] = None
+    
+    class Config:
+        from_attributes = True

@@ -6,9 +6,13 @@ Database configuration for the application.
 """
 
 import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 # Lee la URL de la base de datos desde la variable de entorno DATABASE_URL
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")

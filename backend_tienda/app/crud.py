@@ -11,6 +11,8 @@ Main dependencies:
 """
 
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
+from typing import Optional
 from . import models, schemas
 from datetime import datetime
 from .auth import hash_password
@@ -68,6 +70,24 @@ def get_clientes(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Cliente).offset(skip).limit(limit).all()
 
 def crear_cliente(db: Session, cliente: schemas.ClienteCreate):
+    """
+    Creates a new client. Validates that the user exists before creating.
+    
+    Args:
+        db (Session): Database session.
+        cliente (schemas.ClienteCreate): Client data to create.
+    
+    Returns:
+        models.Cliente: Created client.
+    
+    Raises:
+        HTTPException: If the user doesn't exist.
+    """
+    # Validar que el usuario existe
+    usuario = get_usuario(db, cliente.id_usuario)
+    if not usuario:
+        raise HTTPException(status_code=404, detail=f"Usuario con ID {cliente.id_usuario} no encontrado")
+    
     db_cliente = models.Cliente(
         id_usuario=cliente.id_usuario,
         nombre=cliente.nombre,
@@ -100,6 +120,30 @@ def get_productos(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Producto).offset(skip).limit(limit).all()
 
 def crear_producto(db: Session, producto: schemas.ProductoCreate):
+    """
+    Creates a new product. Validates that the category exists before creating.
+    
+    Args:
+        db (Session): Database session.
+        producto (schemas.ProductoCreate): Product data to create.
+    
+    Returns:
+        models.Producto: Created product.
+    
+    Raises:
+        HTTPException: If the category doesn't exist or price/quantity is invalid.
+    """
+    # Validar que la categoría existe
+    categoria = get_categoria(db, producto.id_categoria)
+    if not categoria:
+        raise HTTPException(status_code=404, detail=f"Categoría con ID {producto.id_categoria} no encontrada")
+    
+    # Validar que precio y cantidad sean positivos
+    if producto.precio <= 0:
+        raise HTTPException(status_code=400, detail="El precio debe ser mayor a 0")
+    if producto.cantidad < 0:
+        raise HTTPException(status_code=400, detail="La cantidad no puede ser negativa")
+    
     db_producto = models.Producto(
         id_categoria=producto.id_categoria,
         nombre=producto.nombre,
@@ -118,6 +162,24 @@ def get_pedidos(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Pedido).offset(skip).limit(limit).all()
 
 def crear_pedido(db: Session, pedido: schemas.PedidoCreate):
+    """
+    Creates a new order. Validates that the client exists before creating.
+    
+    Args:
+        db (Session): Database session.
+        pedido (schemas.PedidoCreate): Order data to create.
+    
+    Returns:
+        models.Pedido: Created order.
+    
+    Raises:
+        HTTPException: If the client doesn't exist.
+    """
+    # Validar que el cliente existe
+    cliente = get_cliente(db, pedido.id_cliente)
+    if not cliente:
+        raise HTTPException(status_code=404, detail=f"Cliente con ID {pedido.id_cliente} no encontrado")
+    
     db_pedido = models.Pedido(
         id_cliente=pedido.id_cliente,
         estado=pedido.estado,
@@ -136,34 +198,88 @@ def get_detalles_pedido(db: Session, skip: int = 0, limit: int = 100):
 def crear_detalle_pedido(db: Session, detalle: schemas.DetallePedidoCreate):
     """
     Creates an order detail and deducts the corresponding product inventory.
-    Raises an exception if there is not enough inventory.
+    Uses transactions to ensure atomicity.
+    
+    Args:
+        db (Session): Database session.
+        detalle (schemas.DetallePedidoCreate): Order detail data.
+    
+    Returns:
+        models.DetallePedido: Created order detail.
+    
+    Raises:
+        HTTPException: If there's not enough inventory or if pedido/producto doesn't exist.
     """
-    subtotal = detalle.cantidad * detalle.precio_unitario
-    db_detalle = models.DetallePedido(
-        id_pedido=detalle.id_pedido,
-        id_producto=detalle.id_producto,
-        cantidad=detalle.cantidad,
-        precio_unitario=detalle.precio_unitario,
-        subtotal=subtotal
-    )
-    # Deduct the quantity from the product inventory
-    producto = db.query(models.Producto).filter(models.Producto.id_producto == detalle.id_producto).first()
-    if producto:
-        if producto.cantidad >= detalle.cantidad:
-            producto.cantidad -= detalle.cantidad
-        else:
-            raise Exception(f"Not enough inventory for product: {producto.nombre}")
-    db.add(db_detalle)
-    db.commit()
-    db.refresh(db_detalle)
-    return db_detalle
+    try:
+        # Validar que el pedido existe
+        pedido = get_pedido(db, detalle.id_pedido)
+        if not pedido:
+            raise HTTPException(status_code=404, detail=f"Pedido con ID {detalle.id_pedido} no encontrado")
+        
+        # Validar que el producto existe
+        producto = db.query(models.Producto).filter(models.Producto.id_producto == detalle.id_producto).first()
+        if not producto:
+            raise HTTPException(status_code=404, detail=f"Producto con ID {detalle.id_producto} no encontrado")
+        
+        # Validar inventario suficiente
+        if producto.cantidad < detalle.cantidad:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Inventario insuficiente para el producto {producto.nombre}. Disponible: {producto.cantidad}, Solicitado: {detalle.cantidad}"
+            )
+        
+        # Validar cantidad positiva
+        if detalle.cantidad <= 0:
+            raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
+        
+        # Validar precio positivo
+        if detalle.precio_unitario <= 0:
+            raise HTTPException(status_code=400, detail="El precio unitario debe ser mayor a 0")
+        
+        # Calcular subtotal
+        subtotal = detalle.cantidad * detalle.precio_unitario
+        
+        # Crear detalle de pedido
+        db_detalle = models.DetallePedido(
+            id_pedido=detalle.id_pedido,
+            id_producto=detalle.id_producto,
+            cantidad=detalle.cantidad,
+            precio_unitario=detalle.precio_unitario,
+            subtotal=subtotal
+        )
+        
+        # Descontar inventario
+        producto.cantidad -= detalle.cantidad
+        
+        db.add(db_detalle)
+        db.commit()
+        db.refresh(db_detalle)
+        return db_detalle
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear detalle de pedido: {str(e)}")
 
 def actualizar_usuario(db: Session, usuario_id: int, usuario: schemas.UsuarioCreate):
+    """
+    Updates a user in the database. Always hashes the password if provided.
+    
+    Args:
+        db (Session): Database session.
+        usuario_id (int): User ID to update.
+        usuario (schemas.UsuarioCreate): Updated user data.
+    
+    Returns:
+        models.Usuario | None: Updated user or None if not found.
+    """
     db_usuario = get_usuario(db, usuario_id)
     if not db_usuario:
         return None
     db_usuario.correo = usuario.correo
-    db_usuario.contraseña = usuario.contraseña
+    # Siempre hashear la contraseña si se proporciona
+    db_usuario.contraseña = hash_password(usuario.contraseña)
     db_usuario.rol = usuario.rol
     db.commit()
     db.refresh(db_usuario)
@@ -304,6 +420,24 @@ def get_carrito(db: Session, carrito_id: int):
     return db.query(models.Carrito).filter(models.Carrito.id_carrito == carrito_id).first()
 
 def crear_carrito(db: Session, carrito: schemas.CarritoCreate):
+    """
+    Creates a new shopping cart. Validates that the client exists.
+    
+    Args:
+        db (Session): Database session.
+        carrito (schemas.CarritoCreate): Cart data to create.
+    
+    Returns:
+        models.Carrito: Created cart.
+    
+    Raises:
+        HTTPException: If the client doesn't exist.
+    """
+    # Validar que el cliente existe
+    cliente = get_cliente(db, carrito.id_cliente)
+    if not cliente:
+        raise HTTPException(status_code=404, detail=f"Cliente con ID {carrito.id_cliente} no encontrado")
+    
     db_carrito = models.Carrito(
         id_cliente=carrito.id_cliente,
         estado=carrito.estado,
@@ -339,17 +473,65 @@ def get_detalle_carrito(db: Session, detalle_id: int):
     return db.query(models.DetalleCarrito).filter(models.DetalleCarrito.id_detalle_carrito == detalle_id).first()
 
 def crear_detalle_carrito(db: Session, detalle: schemas.DetalleCarritoCreate):
-    db_detalle = models.DetalleCarrito(
-        id_carrito=detalle.id_carrito,
-        id_producto=detalle.id_producto,
-        cantidad=detalle.cantidad,
-        precio_unitario=detalle.precio_unitario,
-        subtotal=detalle.subtotal
-    )
-    db.add(db_detalle)
-    db.commit()
-    db.refresh(db_detalle)
-    return db_detalle
+    """
+    Creates a cart detail item. Validates inventory availability.
+    
+    Args:
+        db (Session): Database session.
+        detalle (schemas.DetalleCarritoCreate): Cart detail data.
+    
+    Returns:
+        models.DetalleCarrito: Created cart detail.
+    
+    Raises:
+        HTTPException: If cart/product doesn't exist or insufficient inventory.
+    """
+    try:
+        # Validar que el carrito existe
+        carrito = get_carrito(db, detalle.id_carrito)
+        if not carrito:
+            raise HTTPException(status_code=404, detail=f"Carrito con ID {detalle.id_carrito} no encontrado")
+        
+        # Validar que el producto existe
+        producto = db.query(models.Producto).filter(models.Producto.id_producto == detalle.id_producto).first()
+        if not producto:
+            raise HTTPException(status_code=404, detail=f"Producto con ID {detalle.id_producto} no encontrado")
+        
+        # Validar inventario suficiente (para carrito, verificamos pero no descontamos aún)
+        if producto.cantidad < detalle.cantidad:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Inventario insuficiente para el producto {producto.nombre}. Disponible: {producto.cantidad}, Solicitado: {detalle.cantidad}"
+            )
+        
+        # Validar cantidad positiva
+        if detalle.cantidad <= 0:
+            raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
+        
+        # Validar precio positivo
+        if detalle.precio_unitario <= 0:
+            raise HTTPException(status_code=400, detail="El precio unitario debe ser mayor a 0")
+        
+        # Calcular subtotal si no se proporciona
+        subtotal = detalle.subtotal if detalle.subtotal else (detalle.cantidad * detalle.precio_unitario)
+        
+        db_detalle = models.DetalleCarrito(
+            id_carrito=detalle.id_carrito,
+            id_producto=detalle.id_producto,
+            cantidad=detalle.cantidad,
+            precio_unitario=detalle.precio_unitario,
+            subtotal=subtotal
+        )
+        db.add(db_detalle)
+        db.commit()
+        db.refresh(db_detalle)
+        return db_detalle
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear detalle de carrito: {str(e)}")
 
 def actualizar_detalle_carrito(db: Session, detalle_id: int, detalle: schemas.DetalleCarritoCreate):
     db_detalle = get_detalle_carrito(db, detalle_id)
@@ -374,3 +556,36 @@ def eliminar_detalle_carrito(db: Session, detalle_id: int):
 
 def get_cliente_por_id_usuario(db: Session, id_usuario: int):
     return db.query(models.Cliente).filter(models.Cliente.id_usuario == id_usuario).first()
+
+def get_audit_logs(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    tabla_nombre: Optional[str] = None,
+    registro_id: Optional[int] = None,
+    accion: Optional[str] = None,
+    usuario_id: Optional[int] = None,
+    fecha_desde: Optional[datetime] = None,
+    fecha_hasta: Optional[datetime] = None
+):
+    """
+    Obtiene logs de auditoría con filtros.
+    Solo accesible para administradores.
+    """
+    from datetime import datetime
+    query = db.query(models.AuditLog)
+    
+    if tabla_nombre:
+        query = query.filter(models.AuditLog.tabla_nombre == tabla_nombre)
+    if registro_id:
+        query = query.filter(models.AuditLog.registro_id == registro_id)
+    if accion:
+        query = query.filter(models.AuditLog.accion == accion)
+    if usuario_id:
+        query = query.filter(models.AuditLog.usuario_id == usuario_id)
+    if fecha_desde:
+        query = query.filter(models.AuditLog.fecha_accion >= fecha_desde)
+    if fecha_hasta:
+        query = query.filter(models.AuditLog.fecha_accion <= fecha_hasta)
+    
+    return query.order_by(models.AuditLog.fecha_accion.desc()).offset(skip).limit(limit).all()

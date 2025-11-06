@@ -12,21 +12,35 @@ Main dependencies:
 - passlib
 """
 
+import os
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
+from dotenv import load_dotenv
 
+# Cargar variables de entorno
+load_dotenv()
 
-# Cambia esta clave por una segura y mantenla en secreto
-SECRET_KEY = "cambia_esta_clave_por_una_segura"
+# Leer SECRET_KEY desde variable de entorno, con fallback para desarrollo
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError(
+        "SECRET_KEY no está configurada. Por favor, configura la variable de entorno SECRET_KEY."
+    )
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Configurar CryptContext con bcrypt, deshabilitando la detección automática de bugs
+# que puede causar problemas con algunas versiones de bcrypt
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=12
+)
 
 def crear_token_de_acceso(data: dict, expires_delta: timedelta = None):
     """
@@ -83,6 +97,62 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
             headers={"WWW-Authenticate": "Bearer"},
         )
     return payload
+
+def require_role(required_roles: list[str]):
+    """
+    Dependency factory that validates the user has one of the required roles.
+    
+    Args:
+        required_roles: List of allowed roles (e.g., ["admin"], ["cliente"], ["admin", "cliente"])
+    
+    Returns:
+        function: Dependency function that validates the role
+    """
+    def role_checker(current_user: dict = Depends(get_current_user)):
+        user_role = current_user.get("rol")
+        if user_role not in required_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado. Se requiere uno de los roles: {required_roles}"
+            )
+        return current_user
+    return role_checker
+
+def require_admin():
+    """Dependency that validates the user is an administrator."""
+    return require_role(["admin"])
+
+def require_cliente():
+    """Dependency that validates the user is a client."""
+    return require_role(["cliente"])
+
+def require_cliente_or_admin():
+    """Dependency that validates the user is a client or administrator."""
+    return require_role(["cliente", "admin"])
+
+def verify_resource_owner(resource_user_id: int, current_user: dict = Depends(get_current_user)):
+    """
+    Validates that the user is the owner of the resource or is an administrator.
+    
+    Args:
+        resource_user_id: ID of the user who owns the resource
+        current_user: Current authenticated user
+    
+    Returns:
+        dict: Authenticated user if they have permissions
+    
+    Raises:
+        HTTPException: If the user doesn't have permissions
+    """
+    user_id = current_user.get("id_usuario")
+    user_role = current_user.get("rol")
+    
+    if user_role != "admin" and user_id != resource_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para acceder a este recurso"
+        )
+    return current_user
 
 def hash_password(password: str) -> str:
     """

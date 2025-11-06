@@ -24,9 +24,13 @@ backend_tienda/
 │   ├── crud.py           # CRUD operations
 │   ├── database.py       # Database configuration
 │   ├── auth.py           # Authentication and security
+│   ├── audit.py          # Auditing system
 │   └── __init__.py
+├── tests/                # Test suite
 ├── requirements.txt      # Project dependencies
-└── Procfile              # For deployment on platforms like Heroku
+├── runtime.txt          # Python version for deployment
+├── pytest.ini          # Pytest configuration
+└── Procfile             # For deployment on platforms like Heroku/Render
 ```
 
 ## Installation
@@ -50,13 +54,22 @@ backend_tienda/
 
 ## Configuration
 
-The database connection is defined in `app/database.py`. By default, it uses PostgreSQL on Supabase:
+The application uses environment variables for configuration. Create a `.env` file in the `backend_tienda` directory:
 
-```python
-SQLALCHEMY_DATABASE_URL = "postgresql://<user>:<password>@<host>:<port>/<db>"
+```env
+DATABASE_URL=postgresql://user:password@host:port/database
+SECRET_KEY=your-secret-key-here-min-32-characters
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+CORS_ORIGINS=*
 ```
 
-Modify this URL if you need to connect to another database.
+**Variables requeridas:**
+- `DATABASE_URL`: URL de conexión a PostgreSQL (Supabase)
+- `SECRET_KEY`: Clave secreta para JWT (mínimo 32 caracteres)
+
+**Variables opcionales:**
+- `ACCESS_TOKEN_EXPIRE_MINUTES`: Tiempo de expiración del token (default: 60)
+- `CORS_ORIGINS`: Orígenes permitidos para CORS (default: "*")
 
 ## Running
 
@@ -85,7 +98,33 @@ The interactive API documentation is available at [http://localhost:8000/docs](h
 
 ## Deployment
 
-Includes a `Procfile` for deployment on platforms like Heroku.
+### Render.com
+
+El proyecto está configurado para desplegarse en Render. Sigue estos pasos:
+
+1. **Conecta tu repositorio GitHub a Render:**
+   - Inicia sesión en [Render](https://render.com)
+   - Ve a "New" → "Web Service"
+   - Conecta tu repositorio de GitHub
+
+2. **Configura el servicio:**
+   - **Build Command:** `pip install -r backend_tienda/requirements.txt`
+   - **Start Command:** `cd backend_tienda && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Environment:** Python 3
+
+3. **Configura las variables de entorno en Render:**
+   - `DATABASE_URL`: Tu URL de Supabase PostgreSQL
+   - `SECRET_KEY`: Clave secreta para JWT (genera una segura)
+   - `ACCESS_TOKEN_EXPIRE_MINUTES`: 60 (opcional)
+   - `CORS_ORIGINS`: "*" o URLs específicas de tu frontend (opcional)
+
+4. **Despliegue:**
+   - Render detectará automáticamente el `render.yaml` en la raíz del proyecto
+   - O puedes configurar manualmente usando las instrucciones anteriores
+
+### Otras plataformas
+
+Incluye un `Procfile` compatible con Heroku y otras plataformas similares.
 
 ## License
 
