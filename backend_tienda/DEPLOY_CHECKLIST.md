@@ -7,9 +7,11 @@
    - [ ] Revisar el frontend (`front_rosaline`) y cualquier cliente móvil para asegurarse de que consumen el dominio final (`https://api.tienda.com` o IP pública temporal) en lugar de `localhost` o Railway.
    - [ ] Confirmar que los webhooks o integraciones externas usan el nuevo dominio.
 
-3. **Conexiones a PostgreSQL**
-   - [ ] Considerar ampliar `database.py` para usar parámetros de pool (`pool_size`, `max_overflow`, `pool_timeout`) leyendo `DB_POOL_*` del `.env` cuando migres a Aurora para optimizar conexiones y evitar saturación.
-   - [ ] Configurar `pgbouncer` o RDS Proxy si el número de workers crece.
+3. **Conexiones a Amazon Aurora PostgreSQL**
+   - [x] `database.py` ya está configurado con parámetros de pool (`pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle`) leyendo `DB_POOL_*` del `.env` para optimizar conexiones y evitar saturación.
+   - [ ] Verificar que la `DATABASE_URL` apunta correctamente a Aurora: `postgresql://postgres:Ecommerce2025!@ecommerce-aurora-db.c5qc4qo884xb.us-east-2.rds.amazonaws.com:5432/postgres`
+   - [ ] Configurar RDS Proxy o ajustar el pool si el número de workers crece significativamente.
+   - [ ] Verificar que el Security Group de Aurora permite conexiones desde tu instancia EC2 (puerto 5432).
 
 4. **CORS**
    - [ ] Ajustar `CORS_ORIGINS` en `.env` con los dominios reales del frontend (producción y, si aplica, staging). Evitar `*` en producción.
@@ -24,7 +26,7 @@
 
 7. **Automatización**
    - [ ] Ejecutar `deploy.sh` después de subir cambios para instalar dependencias, habilitar systemd y recargar Nginx.
-   - [ ] Agendar `systemd` o `cron` para respaldos periódicos mientras migras de Supabase a Aurora.
+   - [ ] Configurar respaldos automáticos de Aurora usando AWS Backup o snapshots programados.
 
 Completar esta lista garantiza que el backend FastAPI está alineado con las mejores prácticas de producción en AWS EC2.
 

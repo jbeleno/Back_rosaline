@@ -56,30 +56,89 @@ backend_tienda/
 
 The application uses environment variables for configuration. Create a `.env` file in the `backend_tienda` directory:
 
+**Opción 1: Copiar desde el archivo de ejemplo**
+```bash
+cp .env.example .env
+# Luego edita .env con tus valores específicos
+```
+
+**Opción 2: Crear manualmente**
+
 ```env
-DATABASE_URL=postgresql://user:password@host:port/database
+# Entorno
+APP_ENV=development
+PYTHONPATH=./app
+DEBUG=True
+
+# Amazon Aurora PostgreSQL
+DATABASE_URL=postgresql://postgres:Ecommerce2025!@ecommerce-aurora-db.c5qc4qo884xb.us-east-2.rds.amazonaws.com:5432/postgres
+
+# Seguridad
 SECRET_KEY=your-secret-key-here-min-32-characters
 ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# CORS
 CORS_ORIGINS=*
+
+# Pool de conexiones (opcional)
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=5
+DB_POOL_TIMEOUT=30
+DB_POOL_RECYCLE=3600
 ```
 
 **Variables requeridas:**
-- `DATABASE_URL`: URL de conexión a PostgreSQL (Supabase)
+- `DATABASE_URL`: URL de conexión a Amazon Aurora PostgreSQL
+  - Formato: `postgresql://usuario:password@host:puerto/base`
+  - Ejemplo: `postgresql://postgres:password@ecommerce-aurora-db.c5qc4qo884xb.us-east-2.rds.amazonaws.com:5432/postgres`
 - `SECRET_KEY`: Clave secreta para JWT (mínimo 32 caracteres)
 
 **Variables opcionales:**
 - `ACCESS_TOKEN_EXPIRE_MINUTES`: Tiempo de expiración del token (default: 60)
 - `CORS_ORIGINS`: Orígenes permitidos para CORS (default: "*")
+- `DB_POOL_SIZE`: Tamaño del pool de conexiones (default: 10)
+- `DB_MAX_OVERFLOW`: Conexiones adicionales permitidas (default: 5)
+- `DB_POOL_TIMEOUT`: Timeout del pool en segundos (default: 30)
+- `DB_POOL_RECYCLE`: Tiempo de reciclaje de conexiones en segundos (default: 3600)
 
 ## Running
 
 To start the development server:
 
 ```bash
+cd backend_tienda
 uvicorn app.main:app --reload
 ```
 
 The API will be available at: [http://localhost:8000](http://localhost:8000)
+
+## Conexión a Amazon Aurora PostgreSQL
+
+El proyecto está configurado para conectarse a Amazon Aurora PostgreSQL. Asegúrate de:
+
+1. **Verificar conectividad desde tu máquina/servidor:**
+   ```bash
+   # Probar conexión con psql (si está instalado)
+   psql -h ecommerce-aurora-db.c5qc4qo884xb.us-east-2.rds.amazonaws.com -U postgres -d postgres -p 5432
+   ```
+
+2. **Configurar Security Groups en AWS:**
+   - Asegúrate de que el Security Group de Aurora permita conexiones desde tu IP o instancia EC2
+   - Puerto: 5432
+   - Protocolo: TCP
+
+3. **Verificar que las tablas existan:**
+   - El proyecto creará automáticamente las tablas si no existen (solo en desarrollo)
+   - En producción, usa migraciones con Alembic o crea las tablas manualmente
+
+4. **Comandos útiles para conectarse a Aurora:**
+   ```bash
+   # Usando psql
+   psql "postgresql://postgres:Ecommerce2025!@ecommerce-aurora-db.c5qc4qo884xb.us-east-2.rds.amazonaws.com:5432/postgres"
+   
+   # Verificar conexión desde Python
+   python -c "from app.database import engine; engine.connect(); print('Conexión exitosa')"
+   ```
 
 ## Main Endpoints
 
@@ -113,7 +172,7 @@ El proyecto está configurado para desplegarse en Render. Sigue estos pasos:
    - **Environment:** Python 3
 
 3. **Configura las variables de entorno en Render:**
-   - `DATABASE_URL`: Tu URL de Supabase PostgreSQL
+   - `DATABASE_URL`: Tu URL de Amazon Aurora PostgreSQL
    - `SECRET_KEY`: Clave secreta para JWT (genera una segura)
    - `ACCESS_TOKEN_EXPIRE_MINUTES`: 60 (opcional)
    - `CORS_ORIGINS`: "*" o URLs específicas de tu frontend (opcional)
