@@ -1,0 +1,28 @@
+[Unit]
+Description=FastAPI E-commerce Backend
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=www-data
+WorkingDirectory=/var/www/fastapi-ecommerce/backend_tienda
+EnvironmentFile=/var/www/fastapi-ecommerce/backend_tienda/.env
+ExecStart=/var/www/fastapi-ecommerce/backend_tienda/.venv/bin/gunicorn -c gunicorn.conf.py --pid /run/fastapi-ecommerce/fastapi-ecommerce.pid app.main:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=30
+KillMode=mixed
+LimitNOFILE=65536
+PIDFile=/run/fastapi-ecommerce/fastapi-ecommerce.pid
+
+# Garantizar que el socket exista con los permisos correctos
+RuntimeDirectory=fastapi-ecommerce
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target
+
