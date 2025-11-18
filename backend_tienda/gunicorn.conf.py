@@ -19,8 +19,7 @@ import os
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parent
-DEFAULT_SOCKET = "unix:/run/fastapi-ecommerce.sock"
-
+DEFAULT_SOCKET = "unix:/run/fastapi-ecommerce/fastapi-ecommerce.sock"
 bind = os.getenv("GUNICORN_BIND", DEFAULT_SOCKET)
 workers = int(os.getenv("GUNICORN_WORKERS", (multiprocessing.cpu_count() * 2) + 1))
 worker_class = "uvicorn.workers.UvicornWorker"
