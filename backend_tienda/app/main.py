@@ -394,6 +394,35 @@ def eliminar_producto(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     return {"mensaje": "Producto eliminado correctamente"}
 
+@app.get("/pedidos/{pedido_id}", response_model=schemas.Pedido)
+def obtener_pedido(
+    pedido_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener un pedido específico por ID.
+    Los clientes solo pueden ver sus propios pedidos.
+    Los administradores pueden ver cualquier pedido.
+    """
+    db_pedido = crud.get_pedido(db, pedido_id)
+    if not db_pedido:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    
+    user_id = current_user.get("id_usuario")
+    user_role = current_user.get("rol")
+    
+    # Validar propiedad del recurso
+    if user_role != "admin":
+        cliente = crud.get_cliente(db, db_pedido.id_cliente)
+        if not cliente or cliente.id_usuario != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Solo puedes ver tus propios pedidos"
+            )
+    
+    return db_pedido
+
 @app.put("/pedidos/{pedido_id}", response_model=schemas.Pedido)
 def actualizar_pedido(
     pedido_id: int, 
