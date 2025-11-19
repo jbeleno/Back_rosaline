@@ -113,10 +113,10 @@ def update_audit_log(connection, instance, operation: str):
                 'accion': operation
             }
         )
-        connection.commit()
+        # NO hacer commit aquí - dejar que la transacción principal lo maneje
     except Exception as e:
         # No fallar la operación principal si hay error en auditoría
-        connection.rollback()
+        # NO hacer rollback aquí - dejar que la transacción principal lo maneje
         print(f"Error en auditoría: {e}")
 
 # Registrar listeners para cada modelo usando funciones con closure
