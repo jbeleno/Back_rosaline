@@ -71,7 +71,7 @@ def get_clientes(db: Session, skip: int = 0, limit: int = 100):
 
 def crear_cliente(db: Session, cliente: schemas.ClienteCreate):
     """
-    Creates a new client. Validates that the user exists before creating.
+    Creates a new client. Validates that the user exists and doesn't already have a client profile.
     
     Args:
         db (Session): Database session.
@@ -81,12 +81,20 @@ def crear_cliente(db: Session, cliente: schemas.ClienteCreate):
         models.Cliente: Created client.
     
     Raises:
-        HTTPException: If the user doesn't exist.
+        HTTPException: If the user doesn't exist or already has a client profile.
     """
     # Validar que el usuario existe
     usuario = get_usuario(db, cliente.id_usuario)
     if not usuario:
         raise HTTPException(status_code=404, detail=f"Usuario con ID {cliente.id_usuario} no encontrado")
+    
+    # Validar que el usuario no tenga ya un perfil de cliente
+    cliente_existente = get_cliente_por_id_usuario(db, cliente.id_usuario)
+    if cliente_existente:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"El usuario con ID {cliente.id_usuario} ya tiene un perfil de cliente"
+        )
     
     db_cliente = models.Cliente(
         id_usuario=cliente.id_usuario,
@@ -121,7 +129,7 @@ def get_productos(db: Session, skip: int = 0, limit: int = 100):
 
 def crear_producto(db: Session, producto: schemas.ProductoCreate):
     """
-    Creates a new product. Validates that the category exists before creating.
+    Creates a new product. Validates that the category exists and is active.
     
     Args:
         db (Session): Database session.
@@ -131,18 +139,22 @@ def crear_producto(db: Session, producto: schemas.ProductoCreate):
         models.Producto: Created product.
     
     Raises:
-        HTTPException: If the category doesn't exist or price/quantity is invalid.
+        HTTPException: If the category doesn't exist, is inactive, or price/quantity is invalid.
     """
     # Validar que la categoría existe
     categoria = get_categoria(db, producto.id_categoria)
     if not categoria:
         raise HTTPException(status_code=404, detail=f"Categoría con ID {producto.id_categoria} no encontrada")
     
-    # Validar que precio y cantidad sean positivos
-    if producto.precio <= 0:
-        raise HTTPException(status_code=400, detail="El precio debe ser mayor a 0")
-    if producto.cantidad < 0:
-        raise HTTPException(status_code=400, detail="La cantidad no puede ser negativa")
+    # Validar que la categoría esté activa
+    if categoria.estado != "activo":
+        raise HTTPException(
+            status_code=400, 
+            detail=f"No se pueden crear productos en la categoría '{categoria.nombre}' porque está inactiva"
+        )
+    
+    # Las validaciones de precio y cantidad ya están en el schema de Pydantic
+    # pero las mantenemos aquí como validación adicional de seguridad
     
     db_producto = models.Producto(
         id_categoria=producto.id_categoria,
@@ -163,7 +175,7 @@ def get_pedidos(db: Session, skip: int = 0, limit: int = 100):
 
 def crear_pedido(db: Session, pedido: schemas.PedidoCreate):
     """
-    Creates a new order. Validates that the client exists before creating.
+    Creates a new order. Validates that the client exists and has a valid address.
     
     Args:
         db (Session): Database session.
@@ -173,12 +185,19 @@ def crear_pedido(db: Session, pedido: schemas.PedidoCreate):
         models.Pedido: Created order.
     
     Raises:
-        HTTPException: If the client doesn't exist.
+        HTTPException: If the client doesn't exist or address is invalid.
     """
     # Validar que el cliente existe
     cliente = get_cliente(db, pedido.id_cliente)
     if not cliente:
         raise HTTPException(status_code=404, detail=f"Cliente con ID {pedido.id_cliente} no encontrado")
+    
+    # Validar que la dirección de envío no esté vacía
+    if not pedido.direccion_envio or len(pedido.direccion_envio.strip()) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail="La dirección de envío debe tener al menos 5 caracteres"
+        )
     
     db_pedido = models.Pedido(
         id_cliente=pedido.id_cliente,
@@ -221,6 +240,13 @@ def crear_detalle_pedido(db: Session, detalle: schemas.DetallePedidoCreate):
         if not producto:
             raise HTTPException(status_code=404, detail=f"Producto con ID {detalle.id_producto} no encontrado")
         
+        # Validar que el producto esté activo
+        if producto.estado != "activo":
+            raise HTTPException(
+                status_code=400,
+                detail=f"El producto '{producto.nombre}' no está disponible (estado: {producto.estado})"
+            )
+        
         # Validar inventario suficiente
         if producto.cantidad < detalle.cantidad:
             raise HTTPException(
@@ -228,13 +254,14 @@ def crear_detalle_pedido(db: Session, detalle: schemas.DetallePedidoCreate):
                 detail=f"Inventario insuficiente para el producto {producto.nombre}. Disponible: {producto.cantidad}, Solicitado: {detalle.cantidad}"
             )
         
-        # Validar cantidad positiva
-        if detalle.cantidad <= 0:
-            raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
+        # Validar que el pedido no esté en un estado final
+        if pedido.estado in ["entregado", "cancelado"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se pueden agregar productos a un pedido con estado '{pedido.estado}'"
+            )
         
-        # Validar precio positivo
-        if detalle.precio_unitario <= 0:
-            raise HTTPException(status_code=400, detail="El precio unitario debe ser mayor a 0")
+        # Las validaciones de cantidad y precio ya están en el schema de Pydantic
         
         # Calcular subtotal
         subtotal = detalle.cantidad * detalle.precio_unitario
@@ -297,9 +324,38 @@ def get_cliente(db: Session, cliente_id: int):
     return db.query(models.Cliente).filter(models.Cliente.id_cliente == cliente_id).first()
 
 def actualizar_cliente(db: Session, cliente_id: int, cliente: schemas.ClienteCreate):
+    """
+    Updates a client. Validates that the user exists and doesn't already have another client profile.
+    
+    Args:
+        db (Session): Database session.
+        cliente_id (int): Client ID to update.
+        cliente (schemas.ClienteCreate): Updated client data.
+    
+    Returns:
+        models.Cliente | None: Updated client or None if not found.
+    
+    Raises:
+        HTTPException: If the user doesn't exist or already has another client profile.
+    """
     db_cliente = get_cliente(db, cliente_id)
     if not db_cliente:
         return None
+    
+    # Validar que el usuario existe si se está cambiando
+    if cliente.id_usuario != db_cliente.id_usuario:
+        usuario = get_usuario(db, cliente.id_usuario)
+        if not usuario:
+            raise HTTPException(status_code=404, detail=f"Usuario con ID {cliente.id_usuario} no encontrado")
+        
+        # Validar que el nuevo usuario no tenga ya un perfil de cliente
+        cliente_existente = get_cliente_por_id_usuario(db, cliente.id_usuario)
+        if cliente_existente and cliente_existente.id_cliente != cliente_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El usuario con ID {cliente.id_usuario} ya tiene un perfil de cliente"
+            )
+    
     db_cliente.id_usuario = cliente.id_usuario
     db_cliente.nombre = cliente.nombre
     db_cliente.apellido = cliente.apellido
@@ -344,9 +400,35 @@ def get_producto(db: Session, producto_id: int):
     return db.query(models.Producto).filter(models.Producto.id_producto == producto_id).first()
 
 def actualizar_producto(db: Session, producto_id: int, producto: schemas.ProductoCreate):
+    """
+    Updates a product. Validates that the category exists and is active.
+    
+    Args:
+        db (Session): Database session.
+        producto_id (int): Product ID to update.
+        producto (schemas.ProductoCreate): Updated product data.
+    
+    Returns:
+        models.Producto | None: Updated product or None if not found.
+    
+    Raises:
+        HTTPException: If the category doesn't exist or is inactive.
+    """
     db_producto = get_producto(db, producto_id)
     if not db_producto:
         return None
+    
+    # Validar que la categoría existe si se está cambiando
+    if producto.id_categoria != db_producto.id_categoria:
+        categoria = get_categoria(db, producto.id_categoria)
+        if not categoria:
+            raise HTTPException(status_code=404, detail=f"Categoría con ID {producto.id_categoria} no encontrada")
+        if categoria.estado != "activo":
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se puede asignar el producto a la categoría '{categoria.nombre}' porque está inactiva"
+            )
+    
     db_producto.id_categoria = producto.id_categoria
     db_producto.nombre = producto.nombre
     db_producto.descripcion = producto.descripcion
@@ -370,9 +452,44 @@ def get_pedido(db: Session, pedido_id: int):
     return db.query(models.Pedido).filter(models.Pedido.id_pedido == pedido_id).first()
 
 def actualizar_pedido(db: Session, pedido_id: int, pedido: schemas.PedidoCreate):
+    """
+    Updates an order. Validates that the order is not in a final state.
+    
+    Args:
+        db (Session): Database session.
+        pedido_id (int): Order ID to update.
+        pedido (schemas.PedidoCreate): Updated order data.
+    
+    Returns:
+        models.Pedido | None: Updated order or None if not found.
+    
+    Raises:
+        HTTPException: If the order is in a final state or client doesn't exist.
+    """
     db_pedido = get_pedido(db, pedido_id)
     if not db_pedido:
         return None
+    
+    # Validar que el pedido no esté en un estado final
+    if db_pedido.estado in ["entregado", "cancelado"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede modificar un pedido con estado '{db_pedido.estado}'"
+        )
+    
+    # Validar que el cliente existe si se está cambiando
+    if pedido.id_cliente != db_pedido.id_cliente:
+        cliente = get_cliente(db, pedido.id_cliente)
+        if not cliente:
+            raise HTTPException(status_code=404, detail=f"Cliente con ID {pedido.id_cliente} no encontrado")
+    
+    # Validar dirección de envío
+    if pedido.direccion_envio and len(pedido.direccion_envio.strip()) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail="La dirección de envío debe tener al menos 5 caracteres"
+        )
+    
     db_pedido.id_cliente = pedido.id_cliente
     db_pedido.estado = pedido.estado
     db_pedido.direccion_envio = pedido.direccion_envio
@@ -393,9 +510,57 @@ def get_detalle_pedido(db: Session, detalle_id: int):
     return db.query(models.DetallePedido).filter(models.DetallePedido.id_detalle == detalle_id).first()
 
 def actualizar_detalle_pedido(db: Session, detalle_id: int, detalle: schemas.DetallePedidoCreate):
+    """
+    Updates an order detail. Validates product availability and order state.
+    
+    Args:
+        db (Session): Database session.
+        detalle_id (int): Order detail ID to update.
+        detalle (schemas.DetallePedidoCreate): Updated order detail data.
+    
+    Returns:
+        models.DetallePedido | None: Updated order detail or None if not found.
+    
+    Raises:
+        HTTPException: If product doesn't exist, is inactive, insufficient inventory, or order is in final state.
+    """
     db_detalle = get_detalle_pedido(db, detalle_id)
     if not db_detalle:
         return None
+    
+    # Validar que el pedido no esté en un estado final
+    pedido = get_pedido(db, detalle.id_pedido)
+    if pedido and pedido.estado in ["entregado", "cancelado"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede modificar un detalle de pedido cuando el pedido está en estado '{pedido.estado}'"
+        )
+    
+    # Validar producto si se está cambiando
+    if detalle.id_producto != db_detalle.id_producto:
+        producto = db.query(models.Producto).filter(models.Producto.id_producto == detalle.id_producto).first()
+        if not producto:
+            raise HTTPException(status_code=404, detail=f"Producto con ID {detalle.id_producto} no encontrado")
+        if producto.estado != "activo":
+            raise HTTPException(
+                status_code=400,
+                detail=f"El producto '{producto.nombre}' no está disponible"
+            )
+    
+    # Validar inventario si se está cambiando la cantidad
+    if detalle.cantidad != db_detalle.cantidad:
+        producto = db.query(models.Producto).filter(models.Producto.id_producto == detalle.id_producto).first()
+        if producto:
+            # Calcular cantidad disponible (sumar la cantidad actual del detalle)
+            cantidad_disponible = producto.cantidad + db_detalle.cantidad
+            if cantidad_disponible < detalle.cantidad:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Inventario insuficiente. Disponible: {cantidad_disponible}, Solicitado: {detalle.cantidad}"
+                )
+            # Actualizar inventario
+            producto.cantidad = cantidad_disponible - detalle.cantidad
+    
     db_detalle.id_pedido = detalle.id_pedido
     db_detalle.id_producto = detalle.id_producto
     db_detalle.cantidad = detalle.cantidad
@@ -497,6 +662,20 @@ def crear_detalle_carrito(db: Session, detalle: schemas.DetalleCarritoCreate):
         if not producto:
             raise HTTPException(status_code=404, detail=f"Producto con ID {detalle.id_producto} no encontrado")
         
+        # Validar que el producto esté activo
+        if producto.estado != "activo":
+            raise HTTPException(
+                status_code=400,
+                detail=f"El producto '{producto.nombre}' no está disponible (estado: {producto.estado})"
+            )
+        
+        # Validar que el carrito esté activo
+        if carrito.estado != "activo":
+            raise HTTPException(
+                status_code=400,
+                detail=f"No se pueden agregar productos a un carrito con estado '{carrito.estado}'"
+            )
+        
         # Validar inventario suficiente (para carrito, verificamos pero no descontamos aún)
         if producto.cantidad < detalle.cantidad:
             raise HTTPException(
@@ -504,13 +683,7 @@ def crear_detalle_carrito(db: Session, detalle: schemas.DetalleCarritoCreate):
                 detail=f"Inventario insuficiente para el producto {producto.nombre}. Disponible: {producto.cantidad}, Solicitado: {detalle.cantidad}"
             )
         
-        # Validar cantidad positiva
-        if detalle.cantidad <= 0:
-            raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a 0")
-        
-        # Validar precio positivo
-        if detalle.precio_unitario <= 0:
-            raise HTTPException(status_code=400, detail="El precio unitario debe ser mayor a 0")
+        # Las validaciones de cantidad y precio ya están en el schema de Pydantic
         
         # Calcular subtotal si no se proporciona
         subtotal = detalle.subtotal if detalle.subtotal else (detalle.cantidad * detalle.precio_unitario)
@@ -534,9 +707,65 @@ def crear_detalle_carrito(db: Session, detalle: schemas.DetalleCarritoCreate):
         raise HTTPException(status_code=500, detail=f"Error al crear detalle de carrito: {str(e)}")
 
 def actualizar_detalle_carrito(db: Session, detalle_id: int, detalle: schemas.DetalleCarritoCreate):
+    """
+    Updates a cart detail. Validates product availability and cart state.
+    
+    Args:
+        db (Session): Database session.
+        detalle_id (int): Cart detail ID to update.
+        detalle (schemas.DetalleCarritoCreate): Updated cart detail data.
+    
+    Returns:
+        models.DetalleCarrito | None: Updated cart detail or None if not found.
+    
+    Raises:
+        HTTPException: If product doesn't exist, is inactive, insufficient inventory, or cart is not active.
+    """
     db_detalle = get_detalle_carrito(db, detalle_id)
     if not db_detalle:
         return None
+    
+    # Validar que el carrito esté activo
+    carrito = get_carrito(db, detalle.id_carrito)
+    if carrito and carrito.estado != "activo":
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede modificar un detalle de carrito cuando el carrito está en estado '{carrito.estado}'"
+        )
+    
+    # Validar producto si se está cambiando
+    if detalle.id_producto != db_detalle.id_producto:
+        producto = db.query(models.Producto).filter(models.Producto.id_producto == detalle.id_producto).first()
+        if not producto:
+            raise HTTPException(status_code=404, detail=f"Producto con ID {detalle.id_producto} no encontrado")
+        if producto.estado != "activo":
+            raise HTTPException(
+                status_code=400,
+                detail=f"El producto '{producto.nombre}' no está disponible"
+            )
+    
+    # Validar inventario si se está cambiando la cantidad
+    if detalle.cantidad != db_detalle.cantidad:
+        producto = db.query(models.Producto).filter(models.Producto.id_producto == detalle.id_producto).first()
+        if producto and producto.cantidad < detalle.cantidad:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Inventario insuficiente. Disponible: {producto.cantidad}, Solicitado: {detalle.cantidad}"
+            )
+    
+    # Calcular subtotal si cambia cantidad o precio
+    if detalle.cantidad != db_detalle.cantidad or detalle.precio_unitario != db_detalle.precio_unitario:
+        # Si se proporciona subtotal, validar que coincida; si no, calcularlo
+        if detalle.subtotal:
+            calculado = detalle.cantidad * detalle.precio_unitario
+            if abs(detalle.subtotal - calculado) > 0.01:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"El subtotal debe ser igual a cantidad × precio_unitario ({calculado:.2f})"
+                )
+        else:
+            detalle.subtotal = detalle.cantidad * detalle.precio_unitario
+    
     db_detalle.id_carrito = detalle.id_carrito
     db_detalle.id_producto = detalle.id_producto
     db_detalle.cantidad = detalle.cantidad

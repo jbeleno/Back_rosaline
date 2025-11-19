@@ -46,21 +46,32 @@ pip install -r "$APP_DIR/requirements.txt"
 pip install gunicorn "uvicorn[standard]"
 deactivate
 
-echo "[5/7] Copiando archivos de configuración..."
+echo "[5/8] Copiando archivos de configuración..."
 sudo install -o root -g root -m 640 "$APP_DIR/fastapi-ecommerce.service" "$SYSTEMD_UNIT"
 sudo install -o root -g root -m 640 "$APP_DIR/nginx.conf" "$NGINX_SITE"
 
 if [ ! -f "$APP_DIR/.env" ]; then
   echo "⚠️  No se encontró $APP_DIR/.env. Copiando env.production como base..."
   cp "$APP_DIR/env.production" "$APP_DIR/.env"
+  echo "⚠️  IMPORTANTE: Edita $APP_DIR/.env y configura las variables de entorno antes de continuar"
 fi
 
-echo "[6/7] Habilitando servicio systemd..."
+echo "[6/8] Aplicando migraciones de base de datos..."
+source "$VENV_PATH/bin/activate"
+cd "$APP_DIR"
+# Aplicar migraciones de Alembic
+alembic upgrade head || {
+    echo "⚠️  Error al aplicar migraciones. Verifica la configuración de DATABASE_URL en .env"
+    echo "   Si es la primera vez, crea la migración inicial con: alembic revision --autogenerate -m 'initial_schema'"
+}
+deactivate
+
+echo "[7/8] Habilitando servicio systemd..."
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
 sudo systemctl restart "$SERVICE_NAME"
 
-echo "[7/7] Configurando Nginx..."
+echo "[8/8] Configurando Nginx..."
 sudo ln -sf "$NGINX_SITE" "$NGINX_SITE_LINK"
 sudo nginx -t
 sudo systemctl reload nginx

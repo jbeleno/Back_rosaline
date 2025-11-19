@@ -22,9 +22,23 @@
 
 6. **Auditoría y seguridad**
    - [ ] Validar que `audit.py` almacene IPs reales cuando hay reverse proxy (usa encabezado `X-Forwarded-For` si es necesario).
+
+7. **Migraciones de base de datos**
+   - [ ] Instalar Alembic: `pip install alembic`
+   - [ ] Crear migración inicial: `alembic revision --autogenerate -m "initial_schema"`
+   - [ ] Revisar la migración generada en `alembic/versions/`
+   - [ ] Aplicar migraciones: `alembic upgrade head`
+   - [ ] Verificar que todas las tablas, constraints e índices se crearon correctamente
+   - [ ] Configurar backups automatizados (RDS snapshots o scripts de backup)
+
+8. **Constraints y validaciones de base de datos**
+   - [x] Constraints CHECK agregados en modelos (precios > 0, cantidades >= 0, estados válidos)
+   - [x] Constraint UNIQUE en `clientes.id_usuario`
+   - [x] Índices adicionales para performance agregados
+   - [ ] Verificar que los constraints funcionan correctamente en producción
    - [ ] Revisar políticas de rotación del `SECRET_KEY` y tokens JWT (`ACCESS_TOKEN_EXPIRE_MINUTES`).
 
-7. **Automatización**
+9. **Automatización**
    - [ ] Ejecutar `deploy.sh` después de subir cambios para instalar dependencias, habilitar systemd y recargar Nginx.
    - [ ] Configurar respaldos automáticos de Aurora usando AWS Backup o snapshots programados.
 

@@ -8,6 +8,8 @@ FastAPI application entry point.
 
 import os
 from fastapi import FastAPI, Depends, HTTPException, Body, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -21,11 +23,23 @@ from .audit import set_audit_context, clear_audit_context
 # Cargar variables de entorno
 load_dotenv()
 
-# Crear tablas si no existen (útil para desarrollo, en producción usar migraciones)
-try:
-    models.Base.metadata.create_all(bind=engine)
-except Exception as e:
-    print(f"Advertencia: No se pudieron crear las tablas automáticamente: {e}")
+# En producción, usar migraciones de Alembic en lugar de create_all()
+# Solo crear tablas automáticamente en desarrollo si no hay migraciones
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+if ENVIRONMENT == "development":
+    # Solo en desarrollo: crear tablas si no existen
+    # En producción, siempre usar: alembic upgrade head
+    try:
+        # Verificar si existe la tabla de versiones de Alembic
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        if "alembic_version" not in inspector.get_table_names():
+            # Si no hay migraciones, crear tablas (solo desarrollo)
+            models.Base.metadata.create_all(bind=engine)
+            print("Advertencia: Tablas creadas automáticamente. En producción, usa 'alembic upgrade head'")
+    except Exception as e:
+        print(f"Advertencia: No se pudieron crear las tablas automáticamente: {e}")
+        print("En producción, asegúrate de ejecutar: alembic upgrade head")
 
 # Importar audit para registrar los event listeners
 from . import audit  # noqa: F401
@@ -52,6 +66,61 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Maneja errores de validación de Pydantic y retorna mensajes claros.
+    """
+    errors = []
+    for error in exc.errors():
+        field = " -> ".join(str(loc) for loc in error["loc"] if loc != "body")
+        message = error["msg"]
+        error_type = error["type"]
+        
+        # Mejorar mensajes de error comunes
+        if error_type == "value_error.missing":
+            message = f"El campo '{field}' es requerido"
+        elif error_type == "value_error.email":
+            message = f"'{field}' debe ser un correo electrónico válido"
+        elif error_type == "value_error.str.regex":
+            message = f"'{field}' tiene un formato inválido"
+        elif error_type == "type_error.integer":
+            message = f"'{field}' debe ser un número entero"
+        elif error_type == "type_error.float":
+            message = f"'{field}' debe ser un número decimal"
+        
+        errors.append({
+            "field": field,
+            "message": message,
+            "type": error_type
+        })
+    
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": "Error de validación",
+            "errors": errors,
+            "message": f"Se encontraron {len(errors)} error(es) de validación"
+        }
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Maneja excepciones no controladas y retorna un error genérico.
+    """
+    import traceback
+    print(f"Error no controlado: {exc}")
+    print(traceback.format_exc())
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Error interno del servidor",
+            "message": "Ha ocurrido un error inesperado. Por favor, intenta más tarde."
+        }
+    )
 
 @app.get("/")
 def root():

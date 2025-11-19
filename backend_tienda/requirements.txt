@@ -3,10 +3,12 @@ uvicorn
 sqlalchemy
 psycopg2-binary
 pydantic
+email-validator
 python-jose
 passlib[bcrypt]
 bcrypt==4.1.2
 python-dotenv
+alembic
 pytest
 pytest-asyncio
 httpx
