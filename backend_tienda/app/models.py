@@ -18,9 +18,15 @@ class Usuario(Base):
     contraseña = Column(String(255), nullable=False)
     rol = Column(String(50), nullable=False, default="cliente")
     fecha_creacion = Column(TIMESTAMP, nullable=False)
+    email_verificado = Column(String(1), default="N", nullable=False)  # 'S' o 'N'
+    token_confirmacion = Column(String(255), nullable=True, index=True)  # Token para confirmar email
+    token_confirmacion_expira = Column(TIMESTAMP, nullable=True)  # Expiración del token (1 hora)
+    token_reset = Column(String(6), nullable=True)  # PIN de 6 dígitos para reset de contraseña
+    token_reset_expira = Column(TIMESTAMP, nullable=True)  # Expiración del PIN (15 minutos)
     
     __table_args__ = (
         CheckConstraint("rol IN ('cliente', 'admin')", name="check_rol_valido"),
+        CheckConstraint("email_verificado IN ('S', 'N')", name="check_email_verificado"),
     )
 
 class Cliente(Base):

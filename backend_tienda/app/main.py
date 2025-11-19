@@ -193,10 +193,28 @@ def get_db():
 
 @app.post("/usuarios/", response_model=schemas.Usuario)
 def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
+    """Crear nuevo usuario y enviar email de confirmación."""
     db_usuario = crud.get_usuario_por_correo(db, correo=usuario.correo)
     if db_usuario:
         raise HTTPException(status_code=400, detail="Correo ya registrado")
-    return crud.crear_usuario(db=db, usuario=usuario)
+    
+    nuevo_usuario = crud.crear_usuario(db=db, usuario=usuario)
+    
+    # Enviar email de confirmación
+    from . import email
+    # Obtener nombre del usuario si tiene perfil de cliente
+    nombre = usuario.correo.split("@")[0]  # Usar parte del email como nombre temporal
+    cliente = crud.get_cliente_por_id_usuario(db, nuevo_usuario.id_usuario)
+    if cliente:
+        nombre = f"{cliente.nombre} {cliente.apellido}"
+    
+    email.enviar_email_confirmacion(
+        destinatario=nuevo_usuario.correo,
+        nombre=nombre,
+        token=nuevo_usuario.token_confirmacion
+    )
+    
+    return nuevo_usuario
 
 @app.post("/clientes/", response_model=schemas.Cliente)
 def crear_cliente(
@@ -249,6 +267,33 @@ def obtener_cliente_por_usuario(
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     return cliente
 
+@app.get("/clientes/{cliente_id}", response_model=schemas.Cliente)
+def obtener_cliente(
+    cliente_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtener un cliente específico por ID.
+    Los clientes solo pueden ver su propio perfil.
+    Los administradores pueden ver cualquier perfil.
+    """
+    cliente = crud.get_cliente(db, cliente_id)
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    
+    # Validar propiedad del recurso
+    user_id = current_user.get("id_usuario")
+    user_role = current_user.get("rol")
+    
+    if user_role != "admin" and cliente.id_usuario != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo puedes ver tu propio perfil"
+        )
+    
+    return cliente
+
 @app.post("/categorias/", response_model=schemas.Categoria)
 def crear_categoria(
     categoria: schemas.CategoriaCreate, 
@@ -262,6 +307,14 @@ def crear_categoria(
 def listar_categorias(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_categorias(db, skip=skip, limit=limit)
 
+@app.get("/categorias/{categoria_id}", response_model=schemas.Categoria)
+def obtener_categoria(categoria_id: int, db: Session = Depends(get_db)):
+    """Obtener una categoría específica por ID."""
+    categoria = crud.get_categoria(db, categoria_id)
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    return categoria
+
 @app.post("/productos/", response_model=schemas.Producto)
 def crear_producto(
     producto: schemas.ProductoCreate, 
@@ -274,6 +327,14 @@ def crear_producto(
 @app.get("/productos/", response_model=list[schemas.Producto])
 def listar_productos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_productos(db, skip=skip, limit=limit)
+
+@app.get("/productos/{producto_id}", response_model=schemas.Producto)
+def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
+    """Obtener un producto específico por ID."""
+    producto = crud.get_producto(db, producto_id)
+    if not producto:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return producto
 
 @app.post("/pedidos/", response_model=schemas.Pedido)
 def crear_pedido(
@@ -967,6 +1028,155 @@ def login(datos: dict = Body(...), db: Session = Depends(get_db)):
 @app.get("/usuarios/me")
 def leer_usuarios_me(current_user: dict = Depends(get_current_user)):
     return current_user
+
+# ============================================
+# ENDPOINTS DE CONFIRMACIÓN Y RECUPERACIÓN
+# ============================================
+
+@app.post("/usuarios/confirmar-cuenta", response_model=schemas.ConfirmarCuentaResponse)
+def confirmar_cuenta(
+    request: schemas.ConfirmarCuentaRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Confirma la cuenta de un usuario usando el token recibido por email.
+    """
+    usuario = crud.confirmar_cuenta(db, request.token)
+    return schemas.ConfirmarCuentaResponse(
+        mensaje="Cuenta confirmada exitosamente",
+        email_verificado=True
+    )
+
+
+@app.post("/usuarios/reenviar-confirmacion", response_model=schemas.ReenviarConfirmacionResponse)
+def reenviar_confirmacion(
+    request: schemas.ReenviarConfirmacionRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Reenvía el email de confirmación de cuenta.
+    """
+    nuevo_token = crud.regenerar_token_confirmacion(db, request.correo)
+    
+    # Enviar email
+    from . import email
+    usuario = crud.get_usuario_por_correo(db, request.correo)
+    nombre = request.correo.split("@")[0]
+    cliente = crud.get_cliente_por_id_usuario(db, usuario.id_usuario)
+    if cliente:
+        nombre = f"{cliente.nombre} {cliente.apellido}"
+    
+    email.enviar_email_confirmacion(
+        destinatario=request.correo,
+        nombre=nombre,
+        token=nuevo_token
+    )
+    
+    return schemas.ReenviarConfirmacionResponse(
+        mensaje="Email de confirmación reenviado. Revisa tu bandeja de entrada."
+    )
+
+
+@app.post("/usuarios/solicitar-recuperacion", response_model=schemas.SolicitarRecuperacionResponse)
+def solicitar_recuperacion(
+    request: schemas.SolicitarRecuperacionRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Solicita un PIN de recuperación de contraseña.
+    Se envía un PIN de 6 dígitos al correo del usuario.
+    """
+    try:
+        pin = crud.generar_pin_recuperacion(db, request.correo)
+        
+        # Enviar email con PIN
+        from . import email
+        usuario = crud.get_usuario_por_correo(db, request.correo)
+        nombre = request.correo.split("@")[0]
+        cliente = crud.get_cliente_por_id_usuario(db, usuario.id_usuario)
+        if cliente:
+            nombre = f"{cliente.nombre} {cliente.apellido}"
+        
+        email.enviar_email_recuperacion(
+            destinatario=request.correo,
+            nombre=nombre,
+            pin=pin
+        )
+        
+        return schemas.SolicitarRecuperacionResponse(
+            mensaje="Se ha enviado un PIN de recuperación a tu correo. Revisa tu bandeja de entrada."
+        )
+    except HTTPException:
+        # Por seguridad, siempre retornamos el mismo mensaje
+        return schemas.SolicitarRecuperacionResponse(
+            mensaje="Si el correo existe, se ha enviado un PIN de recuperación."
+        )
+
+
+@app.post("/usuarios/validar-pin", response_model=schemas.ValidarPinResponse)
+def validar_pin(
+    request: schemas.ValidarPinRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Valida un PIN de recuperación de contraseña.
+    Útil para verificar el PIN antes de mostrar el formulario de cambio de contraseña.
+    """
+    es_valido = crud.validar_pin_recuperacion(db, request.correo, request.pin)
+    
+    if es_valido:
+        return schemas.ValidarPinResponse(
+            valido=True,
+            mensaje="PIN válido. Puedes proceder a cambiar tu contraseña."
+        )
+    else:
+        return schemas.ValidarPinResponse(
+            valido=False,
+            mensaje="PIN inválido o expirado. Solicita un nuevo PIN."
+        )
+
+
+@app.post("/usuarios/cambiar-contraseña", response_model=schemas.CambiarContraseñaResponse)
+def cambiar_contraseña(
+    request: schemas.CambiarContraseñaRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Cambia la contraseña usando PIN de recuperación.
+    """
+    crud.cambiar_contraseña_con_pin(
+        db,
+        request.correo,
+        request.pin,
+        request.nueva_contraseña
+    )
+    
+    return schemas.CambiarContraseñaResponse(
+        mensaje="Contraseña cambiada exitosamente. Ya puedes iniciar sesión con tu nueva contraseña."
+    )
+
+
+@app.post("/usuarios/cambiar-contraseña-autenticado", response_model=schemas.CambiarContraseñaAutenticadoResponse)
+def cambiar_contraseña_autenticado(
+    request: schemas.CambiarContraseñaAutenticadoRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Cambia la contraseña de un usuario autenticado.
+    Requiere la contraseña actual para validar.
+    """
+    usuario_id = current_user.get("id_usuario")
+    crud.cambiar_contraseña_usuario(
+        db,
+        usuario_id,
+        request.contraseña_actual,
+        request.nueva_contraseña
+    )
+    
+    return schemas.CambiarContraseñaAutenticadoResponse(
+        mensaje="Contraseña cambiada exitosamente."
+    )
 
 # ============================================
 # ENDPOINTS DE AUDITORÍA

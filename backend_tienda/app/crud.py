@@ -14,8 +14,10 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from typing import Optional
 from . import models, schemas
-from datetime import datetime
+from datetime import datetime, timedelta
 from .auth import hash_password
+import secrets
+import uuid
 
 
 def get_usuario(db: Session, usuario_id: int):
@@ -46,7 +48,7 @@ def get_usuario_por_correo(db: Session, correo: str):
 
 def crear_usuario(db: Session, usuario: schemas.UsuarioCreate):
     """
-    Creates a new user in the database with a hashed password.
+    Creates a new user in the database with a hashed password and generates a confirmation token.
 
     Args:
         db (Session): Database session.
@@ -55,11 +57,17 @@ def crear_usuario(db: Session, usuario: schemas.UsuarioCreate):
     Returns:
         models.Usuario: Created user.
     """
+    # Generar token de confirmación único
+    token_confirmacion = str(uuid.uuid4())
+    
     db_usuario = models.Usuario(
         correo=usuario.correo,
         contraseña=hash_password(usuario.contraseña),
         rol=usuario.rol,
-        fecha_creacion=datetime.utcnow()
+        fecha_creacion=datetime.utcnow(),
+        email_verificado="N",
+        token_confirmacion=token_confirmacion,
+        token_confirmacion_expira=datetime.utcnow() + timedelta(hours=1)  # Expira en 1 hora
     )
     db.add(db_usuario)
     db.commit()
@@ -818,3 +826,200 @@ def get_audit_logs(
         query = query.filter(models.AuditLog.fecha_accion <= fecha_hasta)
     
     return query.order_by(models.AuditLog.fecha_accion.desc()).offset(skip).limit(limit).all()
+
+
+# ============================================
+# FUNCIONES PARA CONFIRMACIÓN Y RECUPERACIÓN
+# ============================================
+
+def confirmar_cuenta(db: Session, token: str) -> models.Usuario:
+    """
+    Confirma la cuenta de un usuario usando el token de confirmación.
+    
+    Args:
+        db: Sesión de base de datos
+        token: Token de confirmación
+    
+    Returns:
+        models.Usuario: Usuario confirmado
+    
+    Raises:
+        HTTPException: Si el token es inválido o ya fue usado
+    """
+    usuario = db.query(models.Usuario).filter(
+        models.Usuario.token_confirmacion == token
+    ).first()
+    
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Token de confirmación inválido")
+    
+    if usuario.email_verificado == "S":
+        raise HTTPException(status_code=400, detail="La cuenta ya está confirmada")
+    
+    # Validar expiración del token
+    if usuario.token_confirmacion_expira and datetime.utcnow() > usuario.token_confirmacion_expira:
+        raise HTTPException(status_code=400, detail="El token de confirmación ha expirado. Solicita un nuevo email de confirmación.")
+    
+    usuario.email_verificado = "S"
+    usuario.token_confirmacion = None  # Invalidar token después de usar
+    usuario.token_confirmacion_expira = None
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
+def generar_pin_recuperacion(db: Session, correo: str) -> str:
+    """
+    Genera un PIN de 6 dígitos para recuperación de contraseña.
+    
+    Args:
+        db: Sesión de base de datos
+        correo: Correo del usuario
+    
+    Returns:
+        str: PIN generado
+    
+    Raises:
+        HTTPException: Si el usuario no existe
+    """
+    usuario = get_usuario_por_correo(db, correo)
+    if not usuario:
+        # Por seguridad, no revelamos si el email existe o no
+        raise HTTPException(
+            status_code=404,
+            detail="Si el correo existe, se enviará un PIN de recuperación"
+        )
+    
+    # Generar PIN de 6 dígitos
+    pin = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+    
+    # Guardar PIN y expiración (15 minutos)
+    usuario.token_reset = pin
+    usuario.token_reset_expira = datetime.utcnow() + timedelta(minutes=15)
+    db.commit()
+    
+    return pin
+
+
+def validar_pin_recuperacion(db: Session, correo: str, pin: str) -> bool:
+    """
+    Valida un PIN de recuperación de contraseña.
+    
+    Args:
+        db: Sesión de base de datos
+        correo: Correo del usuario
+        pin: PIN a validar
+    
+    Returns:
+        bool: True si el PIN es válido, False en caso contrario
+    """
+    usuario = get_usuario_por_correo(db, correo)
+    if not usuario:
+        return False
+    
+    if not usuario.token_reset or not usuario.token_reset_expira:
+        return False
+    
+    if usuario.token_reset != pin:
+        return False
+    
+    if datetime.utcnow() > usuario.token_reset_expira:
+        return False
+    
+    return True
+
+
+def cambiar_contraseña_con_pin(db: Session, correo: str, pin: str, nueva_contraseña: str) -> models.Usuario:
+    """
+    Cambia la contraseña de un usuario usando PIN de recuperación.
+    
+    Args:
+        db: Sesión de base de datos
+        correo: Correo del usuario
+        pin: PIN de recuperación
+        nueva_contraseña: Nueva contraseña en texto plano
+    
+    Returns:
+        models.Usuario: Usuario actualizado
+    
+    Raises:
+        HTTPException: Si el PIN es inválido o expiró
+    """
+    if not validar_pin_recuperacion(db, correo, pin):
+        raise HTTPException(
+            status_code=400,
+            detail="PIN inválido o expirado. Solicita un nuevo PIN."
+        )
+    
+    usuario = get_usuario_por_correo(db, correo)
+    usuario.contraseña = hash_password(nueva_contraseña)
+    usuario.token_reset = None  # Invalidar PIN después de usar
+    usuario.token_reset_expira = None
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
+def cambiar_contraseña_usuario(db: Session, usuario_id: int, contraseña_actual: str, nueva_contraseña: str) -> models.Usuario:
+    """
+    Cambia la contraseña de un usuario autenticado.
+    
+    Args:
+        db: Sesión de base de datos
+        usuario_id: ID del usuario
+        contraseña_actual: Contraseña actual en texto plano
+        nueva_contraseña: Nueva contraseña en texto plano
+    
+    Returns:
+        models.Usuario: Usuario actualizado
+    
+    Raises:
+        HTTPException: Si la contraseña actual es incorrecta o el usuario no existe
+    """
+    from .auth import verify_password
+    
+    usuario = get_usuario(db, usuario_id)
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    if not verify_password(contraseña_actual, usuario.contraseña):
+        raise HTTPException(status_code=400, detail="Contraseña actual incorrecta")
+    
+    usuario.contraseña = hash_password(nueva_contraseña)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
+def regenerar_token_confirmacion(db: Session, correo: str) -> str:
+    """
+    Regenera el token de confirmación para un usuario.
+    
+    Args:
+        db: Sesión de base de datos
+        correo: Correo del usuario
+    
+    Returns:
+        str: Nuevo token de confirmación
+    
+    Raises:
+        HTTPException: Si el usuario no existe o ya está confirmado
+    """
+    usuario = get_usuario_por_correo(db, correo)
+    if not usuario:
+        # Por seguridad, no revelamos si el email existe
+        raise HTTPException(
+            status_code=404,
+            detail="Si el correo existe y no está confirmado, se enviará un nuevo email"
+        )
+    
+    if usuario.email_verificado == "S":
+        raise HTTPException(status_code=400, detail="La cuenta ya está confirmada")
+    
+    # Generar nuevo token con expiración de 1 hora
+    nuevo_token = str(uuid.uuid4())
+    usuario.token_confirmacion = nuevo_token
+    usuario.token_confirmacion_expira = datetime.utcnow() + timedelta(hours=1)
+    db.commit()
+    
+    return nuevo_token

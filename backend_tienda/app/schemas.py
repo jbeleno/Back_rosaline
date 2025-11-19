@@ -32,8 +32,67 @@ class UsuarioCreate(UsuarioBase):
 class Usuario(UsuarioBase):
     id_usuario: int
     fecha_creacion: datetime
+    email_verificado: Optional[str] = "N"
     class Config:
         from_attributes = True
+
+# Schemas para confirmación de cuenta
+class ConfirmarCuentaRequest(BaseModel):
+    token: str = Field(..., description="Token de confirmación recibido por email")
+
+class ConfirmarCuentaResponse(BaseModel):
+    mensaje: str
+    email_verificado: bool
+
+# Schemas para recuperación de contraseña
+class SolicitarRecuperacionRequest(BaseModel):
+    correo: EmailStr = Field(..., description="Correo electrónico del usuario")
+
+class SolicitarRecuperacionResponse(BaseModel):
+    mensaje: str
+
+class ValidarPinRequest(BaseModel):
+    correo: EmailStr = Field(..., description="Correo electrónico del usuario")
+    pin: constr(min_length=6, max_length=6, regex=r'^\d{6}$') = Field(..., description="PIN de 6 dígitos")
+
+class ValidarPinResponse(BaseModel):
+    valido: bool
+    mensaje: str
+
+class CambiarContraseñaRequest(BaseModel):
+    correo: EmailStr = Field(..., description="Correo electrónico del usuario")
+    pin: constr(min_length=6, max_length=6, regex=r'^\d{6}$') = Field(..., description="PIN de 6 dígitos")
+    nueva_contraseña: constr(min_length=8, max_length=100) = Field(..., description="Nueva contraseña")
+    
+    @validator('nueva_contraseña')
+    def validar_contraseña(cls, v):
+        if len(v) < 8:
+            raise ValueError('La contraseña debe tener al menos 8 caracteres')
+        return v
+
+class CambiarContraseñaResponse(BaseModel):
+    mensaje: str
+
+# Schema para cambio de contraseña de usuario autenticado
+class CambiarContraseñaAutenticadoRequest(BaseModel):
+    contraseña_actual: str = Field(..., description="Contraseña actual")
+    nueva_contraseña: constr(min_length=8, max_length=100) = Field(..., description="Nueva contraseña")
+    
+    @validator('nueva_contraseña')
+    def validar_contraseña(cls, v):
+        if len(v) < 8:
+            raise ValueError('La contraseña debe tener al menos 8 caracteres')
+        return v
+
+class CambiarContraseñaAutenticadoResponse(BaseModel):
+    mensaje: str
+
+# Schema para reenviar email de confirmación
+class ReenviarConfirmacionRequest(BaseModel):
+    correo: EmailStr = Field(..., description="Correo electrónico del usuario")
+
+class ReenviarConfirmacionResponse(BaseModel):
+    mensaje: str
 
 class ClienteBase(BaseModel):
     nombre: constr(min_length=1, max_length=100, strip_whitespace=True)
