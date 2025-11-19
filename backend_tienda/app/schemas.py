@@ -53,7 +53,7 @@ class SolicitarRecuperacionResponse(BaseModel):
 
 class ValidarPinRequest(BaseModel):
     correo: EmailStr = Field(..., description="Correo electrónico del usuario")
-    pin: constr(min_length=6, max_length=6, regex=r'^\d{6}$') = Field(..., description="PIN de 6 dígitos")
+    pin: constr(min_length=6, max_length=6, pattern=r'^\d{6}$') = Field(..., description="PIN de 6 dígitos")
 
 class ValidarPinResponse(BaseModel):
     valido: bool
@@ -61,7 +61,7 @@ class ValidarPinResponse(BaseModel):
 
 class CambiarContraseñaRequest(BaseModel):
     correo: EmailStr = Field(..., description="Correo electrónico del usuario")
-    pin: constr(min_length=6, max_length=6, regex=r'^\d{6}$') = Field(..., description="PIN de 6 dígitos")
+    pin: constr(min_length=6, max_length=6, pattern=r'^\d{6}$') = Field(..., description="PIN de 6 dígitos")
     nueva_contraseña: constr(min_length=8, max_length=100) = Field(..., description="Nueva contraseña")
     
     @validator('nueva_contraseña')
@@ -97,7 +97,7 @@ class ReenviarConfirmacionResponse(BaseModel):
 class ClienteBase(BaseModel):
     nombre: constr(min_length=1, max_length=100, strip_whitespace=True)
     apellido: constr(min_length=1, max_length=100, strip_whitespace=True)
-    telefono: Optional[constr(max_length=20, regex=r'^\+?[\d\s-]+$')] = None
+    telefono: Optional[constr(max_length=20, pattern=r'^\+?[\d\s-]+$')] = None
     direccion: Optional[constr(max_length=255)] = None
     
     @validator('nombre', 'apellido')
