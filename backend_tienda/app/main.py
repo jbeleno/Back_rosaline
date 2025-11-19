@@ -201,14 +201,14 @@ def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db))
     nuevo_usuario = crud.crear_usuario(db=db, usuario=usuario)
     
     # Enviar email de confirmación
-    from . import email
+    from . import email_service
     # Obtener nombre del usuario si tiene perfil de cliente
     nombre = usuario.correo.split("@")[0]  # Usar parte del email como nombre temporal
     cliente = crud.get_cliente_por_id_usuario(db, nuevo_usuario.id_usuario)
     if cliente:
         nombre = f"{cliente.nombre} {cliente.apellido}"
     
-    email.enviar_email_confirmacion(
+    email_service.enviar_email_confirmacion(
         destinatario=nuevo_usuario.correo,
         nombre=nombre,
         token=nuevo_usuario.token_confirmacion
@@ -1059,14 +1059,14 @@ def reenviar_confirmacion(
     nuevo_token = crud.regenerar_token_confirmacion(db, request.correo)
     
     # Enviar email
-    from . import email
+    from . import email_service
     usuario = crud.get_usuario_por_correo(db, request.correo)
     nombre = request.correo.split("@")[0]
     cliente = crud.get_cliente_por_id_usuario(db, usuario.id_usuario)
     if cliente:
         nombre = f"{cliente.nombre} {cliente.apellido}"
     
-    email.enviar_email_confirmacion(
+    email_service.enviar_email_confirmacion(
         destinatario=request.correo,
         nombre=nombre,
         token=nuevo_token
@@ -1090,14 +1090,14 @@ def solicitar_recuperacion(
         pin = crud.generar_pin_recuperacion(db, request.correo)
         
         # Enviar email con PIN
-        from . import email
+        from . import email_service
         usuario = crud.get_usuario_por_correo(db, request.correo)
         nombre = request.correo.split("@")[0]
         cliente = crud.get_cliente_por_id_usuario(db, usuario.id_usuario)
         if cliente:
             nombre = f"{cliente.nombre} {cliente.apellido}"
         
-        email.enviar_email_recuperacion(
+        email_service.enviar_email_recuperacion(
             destinatario=request.correo,
             nombre=nombre,
             pin=pin
