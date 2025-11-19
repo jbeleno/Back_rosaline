@@ -38,13 +38,17 @@ app = FastAPI()
 CORS_ORIGINS_ENV = os.getenv("CORS_ORIGINS", "*")
 if CORS_ORIGINS_ENV == "*" or CORS_ORIGINS_ENV == "":
     CORS_ORIGINS = ["*"]
+    # Cuando se usa "*", no se pueden usar credenciales (restricción de CORS)
+    ALLOW_CREDENTIALS = False
 else:
     CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS_ENV.split(",")]
+    # Con orígenes específicos, se pueden usar credenciales
+    ALLOW_CREDENTIALS = True
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
