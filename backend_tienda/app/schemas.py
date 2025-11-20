@@ -15,7 +15,11 @@ class UsuarioBase(BaseModel):
     rol: Optional[str] = Field(default="cliente")
 
 class UsuarioCreate(UsuarioBase):
-    contraseña: constr(min_length=8, max_length=100)
+    contraseña: constr(min_length=8, max_length=100) = Field(
+        ...,
+        description="Contraseña del usuario (mínimo 8 caracteres)",
+        example="miPassword123"
+    )
     
     @validator('contraseña')
     def validar_contraseña(cls, v):
@@ -28,6 +32,15 @@ class UsuarioCreate(UsuarioBase):
         if v and v not in ['cliente', 'admin']:
             raise ValueError('El rol debe ser "cliente" o "admin"')
         return v or 'cliente'
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "correo": "cliente@ejemplo.com",
+                "contraseña": "miPassword123",
+                "rol": "cliente"
+            }
+        }
 
 class Usuario(UsuarioBase):
     id_usuario: int
@@ -108,6 +121,17 @@ class ClienteBase(BaseModel):
 
 class ClienteCreate(ClienteBase):
     id_usuario: int = Field(gt=0, description="ID del usuario asociado")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "id_usuario": 1,
+                "nombre": "Juan",
+                "apellido": "Pérez",
+                "telefono": "+1234567890",
+                "direccion": "Calle Principal 123"
+            }
+        }
 
 class Cliente(ClienteBase):
     id_cliente: int
@@ -135,7 +159,15 @@ class CategoriaBase(BaseModel):
         return v or 'activo'
 
 class CategoriaCreate(CategoriaBase):
-    pass
+    class Config:
+        schema_extra = {
+            "example": {
+                "nombre": "Pasteles",
+                "descripcion_corta": "Deliciosos pasteles artesanales",
+                "descripcion_larga": "Nuestra selección de pasteles incluye opciones para todos los gustos",
+                "estado": "activo"
+            }
+        }
 
 class Categoria(CategoriaBase):
     id_categoria: int
@@ -178,7 +210,18 @@ class ProductoBase(BaseModel):
         return v or 'activo'
 
 class ProductoCreate(ProductoBase):
-    pass
+    class Config:
+        schema_extra = {
+            "example": {
+                "id_categoria": 1,
+                "nombre": "Pastel de Chocolate",
+                "descripcion": "Delicioso pastel de chocolate con crema",
+                "cantidad": 10,
+                "precio": 25.99,
+                "imagen_url": "https://ejemplo.com/pastel-chocolate.jpg",
+                "estado": "activo"
+            }
+        }
 
 class Producto(ProductoBase):
     id_producto: int
@@ -227,7 +270,15 @@ class PedidoBase(BaseModel):
         return v or "PayPal"
 
 class PedidoCreate(PedidoBase):
-    pass
+    class Config:
+        schema_extra = {
+            "example": {
+                "id_cliente": 1,
+                "estado": "pendiente",
+                "direccion_envio": "Calle Principal 123, Ciudad",
+                "metodo_pago": "PayPal"
+            }
+        }
 
 class Pedido(PedidoBase):
     id_pedido: int
@@ -259,7 +310,15 @@ class DetallePedidoBase(BaseModel):
         return round(v, 2)
 
 class DetallePedidoCreate(DetallePedidoBase):
-    pass
+    class Config:
+        schema_extra = {
+            "example": {
+                "id_pedido": 1,
+                "id_producto": 1,
+                "cantidad": 2,
+                "precio_unitario": 25.99
+            }
+        }
 
 class DetallePedido(DetallePedidoBase):
     id_detalle: int
@@ -281,7 +340,13 @@ class CarritoBase(BaseModel):
         return v or 'activo'
 
 class CarritoCreate(CarritoBase):
-    pass
+    class Config:
+        schema_extra = {
+            "example": {
+                "id_cliente": 1,
+                "estado": "activo"
+            }
+        }
 
 class Carrito(CarritoBase):
     id_carrito: int
@@ -330,7 +395,16 @@ class DetalleCarritoBase(BaseModel):
         return round(v, 2) if v is not None else v
 
 class DetalleCarritoCreate(DetalleCarritoBase):
-    pass
+    class Config:
+        schema_extra = {
+            "example": {
+                "id_carrito": 1,
+                "id_producto": 1,
+                "cantidad": 2,
+                "precio_unitario": 25.99,
+                "subtotal": 51.98
+            }
+        }
 
 class DetalleCarrito(DetalleCarritoBase):
     id_detalle_carrito: int
