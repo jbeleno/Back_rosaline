@@ -32,7 +32,7 @@ class Usuario(Base):
 class Cliente(Base):
     __tablename__ = "clientes"
     id_cliente = Column(Integer, primary_key=True, index=True)
-    id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False, unique=True, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     nombre = Column(String(255), nullable=False)
     apellido = Column(String(255), nullable=False)
     telefono = Column(String(15))
@@ -74,7 +74,7 @@ class Producto(Base):
 class Pedido(Base):
     __tablename__ = "pedidos"
     id_pedido = Column(Integer, primary_key=True, index=True)
-    id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"), nullable=False, index=True)
+    id_cliente = Column(Integer, ForeignKey("clientes.id_cliente", ondelete="CASCADE"), nullable=False, index=True)
     estado = Column(String(20), default="pendiente", index=True)
     direccion_envio = Column(Text, nullable=False)
     fecha_pedido = Column(TIMESTAMP, index=True)
@@ -91,7 +91,7 @@ class Pedido(Base):
 class DetallePedido(Base):
     __tablename__ = "detalle_pedidos"
     id_detalle = Column(Integer, primary_key=True, index=True)
-    id_pedido = Column(Integer, ForeignKey("pedidos.id_pedido"), nullable=False, index=True)
+    id_pedido = Column(Integer, ForeignKey("pedidos.id_pedido", ondelete="CASCADE"), nullable=False, index=True)
     id_producto = Column(Integer, ForeignKey("productos.id_producto"), nullable=False)
     cantidad = Column(Integer, nullable=False, default=1)
     precio_unitario = Column(Numeric(10, 2), nullable=False)
@@ -110,7 +110,7 @@ class DetallePedido(Base):
 class Carrito(Base):
     __tablename__ = "carrito"
     id_carrito = Column(Integer, primary_key=True, index=True)
-    id_cliente = Column(Integer, ForeignKey("clientes.id_cliente"), nullable=False, index=True)
+    id_cliente = Column(Integer, ForeignKey("clientes.id_cliente", ondelete="CASCADE"), nullable=False, index=True)
     fecha_creacion = Column(TIMESTAMP)
     estado = Column(String(20), default="activo", index=True)
     cliente = relationship("Cliente")
@@ -123,7 +123,7 @@ class Carrito(Base):
 class DetalleCarrito(Base):
     __tablename__ = "detalle_carrito"
     id_detalle_carrito = Column(Integer, primary_key=True, index=True)
-    id_carrito = Column(Integer, ForeignKey("carrito.id_carrito"), nullable=False, index=True)
+    id_carrito = Column(Integer, ForeignKey("carrito.id_carrito", ondelete="CASCADE"), nullable=False, index=True)
     id_producto = Column(Integer, ForeignKey("productos.id_producto"), nullable=False)
     cantidad = Column(Integer, nullable=False, default=1)
     precio_unitario = Column(Numeric(10, 2), nullable=False)
@@ -145,7 +145,7 @@ class AuditLog(Base):
     tabla_nombre = Column(String(100), nullable=False, index=True)
     registro_id = Column(Integer, nullable=False, index=True)
     accion = Column(String(10), nullable=False, index=True)  # INSERT, UPDATE, DELETE
-    usuario_id = Column(Integer, ForeignKey("usuarios.id_usuario"), index=True, nullable=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id_usuario", ondelete="SET NULL"), index=True, nullable=True)
     usuario_email = Column(String(255), nullable=True)
     ip_address = Column(String(45), nullable=True)
     endpoint = Column(String(255), nullable=True)
