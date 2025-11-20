@@ -83,7 +83,7 @@ def get_usuarios(
 
 def crear_usuario(db: Session, usuario: schemas.UsuarioCreate):
     """
-    Creates a new user in the database with a hashed password and generates a confirmation token.
+    Creates a new user in the database with a hashed password and generates a confirmation PIN.
 
     Args:
         db (Session): Database session.
@@ -92,8 +92,8 @@ def crear_usuario(db: Session, usuario: schemas.UsuarioCreate):
     Returns:
         models.Usuario: Created user.
     """
-    # Generar token de confirmación único
-    token_confirmacion = str(uuid.uuid4())
+    # Generar PIN de confirmación de 6 dígitos
+    pin_confirmacion = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
     
     db_usuario = models.Usuario(
         correo=usuario.correo,
@@ -101,8 +101,8 @@ def crear_usuario(db: Session, usuario: schemas.UsuarioCreate):
         rol=usuario.rol,
         fecha_creacion=datetime.utcnow(),
         email_verificado="N",
-        token_confirmacion=token_confirmacion,
-        token_confirmacion_expira=datetime.utcnow() + timedelta(hours=1)  # Expira en 1 hora
+        token_confirmacion=pin_confirmacion,
+        token_confirmacion_expira=datetime.utcnow() + timedelta(minutes=15)  # Expira en 15 minutos
     )
     db.add(db_usuario)
     db.commit()
@@ -867,36 +867,38 @@ def get_audit_logs(
 # FUNCIONES PARA CONFIRMACIÓN Y RECUPERACIÓN
 # ============================================
 
-def confirmar_cuenta(db: Session, token: str) -> models.Usuario:
+def confirmar_cuenta(db: Session, correo: str, pin: str) -> models.Usuario:
     """
-    Confirma la cuenta de un usuario usando el token de confirmación.
+    Confirma la cuenta de un usuario usando el correo y PIN de confirmación.
     
     Args:
         db: Sesión de base de datos
-        token: Token de confirmación
+        correo: Correo electrónico del usuario
+        pin: PIN de 6 dígitos recibido por email
     
     Returns:
         models.Usuario: Usuario confirmado
     
     Raises:
-        HTTPException: Si el token es inválido o ya fue usado
+        HTTPException: Si el PIN es inválido, expirado o la cuenta ya está confirmada
     """
-    usuario = db.query(models.Usuario).filter(
-        models.Usuario.token_confirmacion == token
-    ).first()
+    usuario = get_usuario_por_correo(db, correo)
     
     if not usuario:
-        raise HTTPException(status_code=404, detail="Token de confirmación inválido")
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     if usuario.email_verificado == "S":
         raise HTTPException(status_code=400, detail="La cuenta ya está confirmada")
     
-    # Validar expiración del token
+    if not usuario.token_confirmacion or usuario.token_confirmacion != pin:
+        raise HTTPException(status_code=400, detail="PIN de confirmación inválido")
+    
+    # Validar expiración del PIN
     if usuario.token_confirmacion_expira and datetime.utcnow() > usuario.token_confirmacion_expira:
-        raise HTTPException(status_code=400, detail="El token de confirmación ha expirado. Solicita un nuevo email de confirmación.")
+        raise HTTPException(status_code=400, detail="El PIN de confirmación ha expirado. Solicita un nuevo PIN.")
     
     usuario.email_verificado = "S"
-    usuario.token_confirmacion = None  # Invalidar token después de usar
+    usuario.token_confirmacion = None  # Invalidar PIN después de usar
     usuario.token_confirmacion_expira = None
     db.commit()
     db.refresh(usuario)
@@ -1028,14 +1030,14 @@ def cambiar_contraseña_usuario(db: Session, usuario_id: int, contraseña_actual
 
 def regenerar_token_confirmacion(db: Session, correo: str) -> str:
     """
-    Regenera el token de confirmación para un usuario.
+    Regenera el PIN de confirmación para un usuario.
     
     Args:
         db: Sesión de base de datos
         correo: Correo del usuario
     
     Returns:
-        str: Nuevo token de confirmación
+        str: Nuevo PIN de confirmación de 6 dígitos
     
     Raises:
         HTTPException: Si el usuario no existe o ya está confirmado
@@ -1045,16 +1047,16 @@ def regenerar_token_confirmacion(db: Session, correo: str) -> str:
         # Por seguridad, no revelamos si el email existe
         raise HTTPException(
             status_code=404,
-            detail="Si el correo existe y no está confirmado, se enviará un nuevo email"
+            detail="Si el correo existe y no está confirmado, se enviará un nuevo PIN"
         )
     
     if usuario.email_verificado == "S":
         raise HTTPException(status_code=400, detail="La cuenta ya está confirmada")
     
-    # Generar nuevo token con expiración de 1 hora
-    nuevo_token = str(uuid.uuid4())
-    usuario.token_confirmacion = nuevo_token
-    usuario.token_confirmacion_expira = datetime.utcnow() + timedelta(hours=1)
+    # Generar nuevo PIN de 6 dígitos con expiración de 15 minutos
+    nuevo_pin = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+    usuario.token_confirmacion = nuevo_pin
+    usuario.token_confirmacion_expira = datetime.utcnow() + timedelta(minutes=15)
     db.commit()
     
-    return nuevo_token
+    return nuevo_pin

@@ -19,8 +19,8 @@ class Usuario(Base):
     rol = Column(String(50), nullable=False, default="cliente")
     fecha_creacion = Column(TIMESTAMP, nullable=False)
     email_verificado = Column(String(1), default="N", nullable=False)  # 'S' o 'N'
-    token_confirmacion = Column(String(255), nullable=True, index=True)  # Token para confirmar email
-    token_confirmacion_expira = Column(TIMESTAMP, nullable=True)  # Expiración del token (1 hora)
+    token_confirmacion = Column(String(6), nullable=True, index=True)  # PIN de 6 dígitos para confirmar email
+    token_confirmacion_expira = Column(TIMESTAMP, nullable=True)  # Expiración del PIN (15 minutos)
     token_reset = Column(String(6), nullable=True)  # PIN de 6 dígitos para reset de contraseña
     token_reset_expira = Column(TIMESTAMP, nullable=True)  # Expiración del PIN (15 minutos)
     

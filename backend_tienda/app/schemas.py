@@ -51,7 +51,8 @@ class Usuario(UsuarioBase):
 
 # Schemas para confirmación de cuenta
 class ConfirmarCuentaRequest(BaseModel):
-    token: str = Field(..., description="Token de confirmación recibido por email")
+    correo: EmailStr = Field(..., description="Correo electrónico del usuario")
+    pin: constr(min_length=6, max_length=6, pattern=r'^\d{6}$') = Field(..., description="PIN de 6 dígitos recibido por email")
 
 class ConfirmarCuentaResponse(BaseModel):
     mensaje: str

@@ -83,20 +83,18 @@ def enviar_email(
         return False
 
 
-def enviar_email_confirmacion(destinatario: str, nombre: str, token: str) -> bool:
+def enviar_email_confirmacion(destinatario: str, nombre: str, pin: str) -> bool:
     """
-    Envía email de confirmación de cuenta.
+    Envía email de confirmación de cuenta con PIN.
     
     Args:
         destinatario: Email del destinatario
         nombre: Nombre del usuario
-        token: Token de confirmación
+        pin: PIN de 6 dígitos para confirmar la cuenta
     
     Returns:
         bool: True si se envió correctamente
     """
-    url_confirmacion = f"{FRONTEND_URL}/confirmar-cuenta?token={token}"
-    
     asunto = "Confirma tu cuenta - Rosaline Bakery"
     
     cuerpo_html = f"""
@@ -109,8 +107,10 @@ def enviar_email_confirmacion(destinatario: str, nombre: str, token: str) -> boo
             .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
             .header {{ background-color: #d4a574; color: white; padding: 20px; text-align: center; }}
             .content {{ padding: 20px; background-color: #f9f9f9; }}
-            .button {{ display: inline-block; padding: 12px 30px; background-color: #d4a574; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
+            .pin-box {{ background-color: #fff; border: 2px solid #d4a574; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }}
+            .pin {{ font-size: 32px; font-weight: bold; color: #d4a574; letter-spacing: 8px; font-family: 'Courier New', monospace; }}
             .footer {{ text-align: center; padding: 20px; color: #666; font-size: 12px; }}
+            .warning {{ background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 15px 0; }}
         </style>
     </head>
     <body>
@@ -120,13 +120,15 @@ def enviar_email_confirmacion(destinatario: str, nombre: str, token: str) -> boo
             </div>
             <div class="content">
                 <h2>¡Bienvenido, {nombre}!</h2>
-                <p>Gracias por registrarte en Rosaline Bakery. Para completar tu registro, por favor confirma tu cuenta haciendo clic en el siguiente botón:</p>
-                <div style="text-align: center;">
-                    <a href="{url_confirmacion}" class="button">Confirmar Cuenta</a>
+                <p>Gracias por registrarte en Rosaline Bakery. Para completar tu registro, ingresa el siguiente PIN de confirmación en la página de registro:</p>
+                <div class="pin-box">
+                    <p style="margin: 0 0 10px 0; color: #666;">Tu PIN de confirmación:</p>
+                    <div class="pin">{pin}</div>
                 </div>
-                <p>O copia y pega este enlace en tu navegador:</p>
-                <p style="word-break: break-all; color: #666;">{url_confirmacion}</p>
-                <p>Este enlace expirará en 1 hora.</p>
+                <div class="warning">
+                    <strong>⚠️ Importante:</strong> Este PIN expirará en 15 minutos. Si no lo usas a tiempo, puedes solicitar uno nuevo.
+                </div>
+                <p>Ingresa este PIN en la página donde te registraste para confirmar tu cuenta.</p>
                 <p>Si no creaste esta cuenta, puedes ignorar este correo.</p>
             </div>
             <div class="footer">
@@ -140,11 +142,13 @@ def enviar_email_confirmacion(destinatario: str, nombre: str, token: str) -> boo
     cuerpo_texto = f"""
     ¡Bienvenido, {nombre}!
     
-    Gracias por registrarte en Rosaline Bakery. Para completar tu registro, por favor confirma tu cuenta visitando el siguiente enlace:
+    Gracias por registrarte en Rosaline Bakery. Para completar tu registro, ingresa el siguiente PIN de confirmación en la página de registro:
     
-    {url_confirmacion}
+    PIN: {pin}
     
-    Este enlace expirará en 1 hora.
+    Este PIN expirará en 15 minutos. Si no lo usas a tiempo, puedes solicitar uno nuevo.
+    
+    Ingresa este PIN en la página donde te registraste para confirmar tu cuenta.
     
     Si no creaste esta cuenta, puedes ignorar este correo.
     

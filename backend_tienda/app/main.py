@@ -323,10 +323,10 @@ def get_db():
 )
 def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
     """
-    Crea un nuevo usuario y envía email de confirmación.
+    Crea un nuevo usuario y envía email de confirmación con PIN.
     
-    **Importante**: Después de registrarte, debes confirmar tu cuenta usando
-    el token que recibirás por email en `/usuarios/confirmar-cuenta`
+    **Importante**: Después de registrarte, recibirás un PIN de 6 dígitos por email.
+    Ingresa este PIN en la misma página de registro para confirmar tu cuenta.
     
     El usuario se crea con rol "cliente" por defecto.
     """
@@ -336,7 +336,7 @@ def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db))
     
     nuevo_usuario = crud.crear_usuario(db=db, usuario=usuario)
     
-    # Enviar email de confirmación
+    # Enviar email de confirmación con PIN
     from . import email_service
     # Obtener nombre del usuario si tiene perfil de cliente
     nombre = usuario.correo.split("@")[0]  # Usar parte del email como nombre temporal
@@ -347,7 +347,7 @@ def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db))
     email_service.enviar_email_confirmacion(
         destinatario=nuevo_usuario.correo,
         nombre=nombre,
-        token=nuevo_usuario.token_confirmacion
+        pin=nuevo_usuario.token_confirmacion
     )
     
     return nuevo_usuario
@@ -1699,11 +1699,12 @@ def leer_usuarios_me(current_user: dict = Depends(get_current_user)):
 @app.post(
     "/usuarios/confirmar-cuenta",
     tags=["Autenticación"],
-    summary="Confirmar cuenta",
+    summary="Confirmar cuenta con PIN",
     response_model=schemas.ConfirmarCuentaResponse,
     responses={
         200: {"description": "Cuenta confirmada exitosamente"},
-        400: {"description": "Token inválido o expirado"}
+        400: {"description": "PIN inválido o expirado"},
+        404: {"description": "Usuario no encontrado"}
     }
 )
 def confirmar_cuenta(
@@ -1711,11 +1712,19 @@ def confirmar_cuenta(
     db: Session = Depends(get_db)
 ):
     """
-    Confirma la cuenta de un usuario usando el token recibido por email.
+    Confirma la cuenta de un usuario usando el correo y PIN recibido por email.
     
     Este endpoint debe ser llamado después del registro para activar la cuenta.
+    El usuario debe ingresar el PIN de 6 dígitos que recibió en su correo electrónico.
+    
+    **Flujo**:
+    1. Usuario se registra en `/usuarios/`
+    2. Recibe un PIN de 6 dígitos por email
+    3. Ingresa el PIN en la misma página de registro
+    4. Frontend llama a este endpoint con correo + PIN
+    5. Cuenta confirmada, usuario puede hacer login
     """
-    usuario = crud.confirmar_cuenta(db, request.token)
+    usuario = crud.confirmar_cuenta(db, request.correo, request.pin)
     return schemas.ConfirmarCuentaResponse(
         mensaje="Cuenta confirmada exitosamente",
         email_verificado=True
@@ -1725,7 +1734,7 @@ def confirmar_cuenta(
 @app.post(
     "/usuarios/reenviar-confirmacion",
     tags=["Autenticación"],
-    summary="Reenviar email de confirmación",
+    summary="Reenviar PIN de confirmación",
     response_model=schemas.ReenviarConfirmacionResponse
 )
 def reenviar_confirmacion(
@@ -1733,11 +1742,12 @@ def reenviar_confirmacion(
     db: Session = Depends(get_db)
 ):
     """
-    Reenvía el email de confirmación de cuenta.
+    Reenvía el email de confirmación con un nuevo PIN.
     
-    Útil si no recibiste el email inicial o el token expiró.
+    Útil si no recibiste el email inicial o el PIN expiró.
+    El nuevo PIN expirará en 15 minutos.
     """
-    nuevo_token = crud.regenerar_token_confirmacion(db, request.correo)
+    nuevo_pin = crud.regenerar_token_confirmacion(db, request.correo)
     
     # Enviar email
     from . import email_service
@@ -1750,11 +1760,11 @@ def reenviar_confirmacion(
     email_service.enviar_email_confirmacion(
         destinatario=request.correo,
         nombre=nombre,
-        token=nuevo_token
+        pin=nuevo_pin
     )
     
     return schemas.ReenviarConfirmacionResponse(
-        mensaje="Email de confirmación reenviado. Revisa tu bandeja de entrada."
+        mensaje="PIN de confirmación reenviado. Revisa tu bandeja de entrada."
     )
 
 
