@@ -1633,6 +1633,14 @@ def productos_de_carrito(
                 }
             }
         },
+        403: {
+            "description": "Cuenta no confirmada",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Debes confirmar tu cuenta antes de iniciar sesión. Revisa tu correo para obtener el PIN de confirmación o solicita uno nuevo."}
+                }
+            }
+        },
         422: {
             "description": "Error de validación",
             "content": {
@@ -1652,6 +1660,10 @@ def login(datos: dict = Body(..., example={"correo": "usuario@ejemplo.com", "con
     
     **El token expira en 60 minutos por defecto.**
     
+    **Importante**: La cuenta debe estar confirmada antes de poder iniciar sesión.
+    Si no has confirmado tu cuenta, recibirás un error 403. Puedes solicitar un nuevo
+    PIN de confirmación usando `/usuarios/reenviar-confirmacion`.
+    
     El token incluye:
     - `sub`: Correo del usuario
     - `id_usuario`: ID del usuario
@@ -1667,6 +1679,14 @@ def login(datos: dict = Body(..., example={"correo": "usuario@ejemplo.com", "con
     usuario = crud.get_usuario_por_correo(db, correo=correo)
     if not usuario or not verify_password(contraseña, usuario.contraseña):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    
+    # Validar que la cuenta esté confirmada
+    if usuario.email_verificado != "S":
+        raise HTTPException(
+            status_code=403,
+            detail="Debes confirmar tu cuenta antes de iniciar sesión. Revisa tu correo para obtener el PIN de confirmación o solicita uno nuevo."
+        )
+    
     # Crear el token
     token = crear_token_de_acceso({"sub": usuario.correo, "id_usuario": usuario.id_usuario, "rol": usuario.rol})
     return {
