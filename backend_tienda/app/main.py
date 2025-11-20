@@ -743,7 +743,7 @@ def listar_detalles_pedido(
 )
 def actualizar_usuario(
     usuario_id: int = Path(..., description="ID del usuario"),
-    usuario: schemas.UsuarioCreate, 
+    usuario: schemas.UsuarioCreate = Body(...), 
     current_user: dict = Depends(require_admin()),
     db: Session = Depends(get_db)
 ):
