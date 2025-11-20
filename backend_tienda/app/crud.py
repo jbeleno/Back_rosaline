@@ -332,14 +332,16 @@ def crear_detalle_pedido(db: Session, detalle: schemas.DetallePedidoCreate):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al crear detalle de pedido: {str(e)}")
 
-def actualizar_usuario(db: Session, usuario_id: int, usuario: schemas.UsuarioCreate):
+def actualizar_usuario(db: Session, usuario_id: int, usuario: schemas.UsuarioUpdate, es_super_admin: bool = False):
     """
-    Updates a user in the database. Always hashes the password if provided.
+    Updates a user in the database. Only updates fields that are provided.
+    Always hashes the password if provided.
     
     Args:
         db (Session): Database session.
         usuario_id (int): User ID to update.
-        usuario (schemas.UsuarioCreate): Updated user data.
+        usuario (schemas.UsuarioUpdate): Updated user data (all fields optional).
+        es_super_admin (bool): Whether the current user is a super admin (can modify email_verificado).
     
     Returns:
         models.Usuario | None: Updated user or None if not found.
@@ -347,10 +349,25 @@ def actualizar_usuario(db: Session, usuario_id: int, usuario: schemas.UsuarioCre
     db_usuario = get_usuario(db, usuario_id)
     if not db_usuario:
         return None
-    db_usuario.correo = usuario.correo
-    # Siempre hashear la contraseña si se proporciona
-    db_usuario.contraseña = hash_password(usuario.contraseña)
-    db_usuario.rol = usuario.rol
+    
+    # Actualizar solo los campos que se proporcionaron
+    if usuario.correo is not None:
+        db_usuario.correo = usuario.correo
+    
+    if usuario.contraseña is not None:
+        db_usuario.contraseña = hash_password(usuario.contraseña)
+    
+    if usuario.rol is not None:
+        db_usuario.rol = usuario.rol
+    
+    # Solo super_admin puede modificar email_verificado
+    if es_super_admin and usuario.email_verificado is not None:
+        db_usuario.email_verificado = usuario.email_verificado
+        # Si se marca como verificado, limpiar tokens de confirmación
+        if usuario.email_verificado == "S":
+            db_usuario.token_confirmacion = None
+            db_usuario.token_confirmacion_expira = None
+    
     db.commit()
     db.refresh(db_usuario)
     return db_usuario

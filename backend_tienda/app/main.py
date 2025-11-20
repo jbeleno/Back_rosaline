@@ -785,7 +785,7 @@ def listar_usuarios(
 )
 def actualizar_usuario(
     usuario_id: int = Path(..., description="ID del usuario"),
-    usuario: schemas.UsuarioCreate = Body(...), 
+    usuario: schemas.UsuarioUpdate = Body(...), 
     current_user: dict = Depends(require_admin()),
     db: Session = Depends(get_db)
 ):
@@ -799,9 +799,13 @@ def actualizar_usuario(
       - Puede modificar su propia cuenta
       - Puede modificar usuarios con rol "cliente"
       - NO puede modificar a otros administradores o super administradores
+      - NO puede modificar email_verificado
     - **Super Admin**:
       - Puede modificar a todos los usuarios (admin, super_admin, cliente)
+      - Puede modificar email_verificado (útil para correos genéricos)
       - NO puede cambiar su propio rol (debe mantener "super_admin")
+    
+    **Nota**: Todos los campos son opcionales. Solo se actualizarán los campos que se proporcionen en el body.
     """
     # Obtener el usuario a modificar
     db_usuario = crud.get_usuario(db, usuario_id)
@@ -810,11 +814,19 @@ def actualizar_usuario(
     
     current_user_id = current_user.get("id_usuario")
     current_user_role = current_user.get("rol")
+    es_super_admin = current_user_role == "super_admin"
+    
+    # Validar que admin no intente modificar email_verificado
+    if not es_super_admin and usuario.email_verificado is not None:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo los super administradores pueden modificar el estado de verificación de email"
+        )
     
     # Validar restricciones para super_admin
-    if current_user_role == "super_admin":
+    if es_super_admin:
         # Super admin puede modificar a todos, pero no puede cambiar su propio rol
-        if usuario_id == current_user_id and usuario.rol != "super_admin":
+        if usuario_id == current_user_id and usuario.rol is not None and usuario.rol != "super_admin":
             raise HTTPException(
                 status_code=403,
                 detail="No puedes cambiar tu propio rol. Los super administradores deben mantener su rol."
@@ -828,7 +840,7 @@ def actualizar_usuario(
                 detail="No puedes modificar a otro administrador o super administrador. Solo puedes modificar tu propia cuenta o usuarios con rol 'cliente'"
             )
     
-    return crud.actualizar_usuario(db, usuario_id, usuario)
+    return crud.actualizar_usuario(db, usuario_id, usuario, es_super_admin=es_super_admin)
 
 @app.delete(
     "/usuarios/{usuario_id}",

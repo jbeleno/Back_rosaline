@@ -42,6 +42,44 @@ class UsuarioCreate(UsuarioBase):
             }
         }
 
+class UsuarioUpdate(BaseModel):
+    correo: Optional[EmailStr] = Field(None, description="Correo electrónico del usuario")
+    contraseña: Optional[constr(min_length=8, max_length=100)] = Field(
+        None,
+        description="Contraseña del usuario (mínimo 8 caracteres). Si se proporciona, se actualizará.",
+        example="miPassword123"
+    )
+    rol: Optional[str] = Field(None, description="Rol del usuario")
+    email_verificado: Optional[str] = Field(None, description="Estado de verificación de email (S, N). Solo super_admin puede modificar esto.")
+    
+    @validator('contraseña')
+    def validar_contraseña(cls, v):
+        if v and len(v) < 8:
+            raise ValueError('La contraseña debe tener al menos 8 caracteres')
+        return v
+    
+    @validator('rol')
+    def validar_rol(cls, v):
+        if v and v not in ['cliente', 'admin', 'super_admin']:
+            raise ValueError('El rol debe ser "cliente", "admin" o "super_admin"')
+        return v
+    
+    @validator('email_verificado')
+    def validar_email_verificado(cls, v):
+        if v and v not in ['S', 'N']:
+            raise ValueError('email_verificado debe ser "S" o "N"')
+        return v
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "correo": "nuevo@correo.com",
+                "contraseña": "miPassword123",
+                "rol": "admin",
+                "email_verificado": "S"
+            }
+        }
+
 class Usuario(UsuarioBase):
     id_usuario: int
     fecha_creacion: datetime
