@@ -17,7 +17,7 @@ from typing import Optional
 from datetime import datetime
 from . import models, schemas, crud
 from .database import SessionLocal, engine
-from .auth import crear_token_de_acceso, get_current_user, verify_password, require_admin, require_cliente_or_admin, verify_resource_owner, verificar_token
+from .auth import crear_token_de_acceso, get_current_user, verify_password, require_admin, require_super_admin, require_cliente_or_admin, verify_resource_owner, verificar_token
 from .audit import set_audit_context, clear_audit_context
 
 # Cargar variables de entorno
@@ -92,7 +92,7 @@ app = FastAPI(
     ## Características
     
     * **Autenticación JWT**: Sistema de autenticación basado en tokens JWT
-    * **Roles**: Sistema de roles (cliente, admin)
+    * **Roles**: Sistema de roles (cliente, admin, super_admin)
     * **Auditoría**: Registro completo de cambios en la base de datos
     * **Confirmación de email**: Sistema de verificación de cuentas
     * **Recuperación de contraseña**: Sistema de recuperación mediante PIN
@@ -379,7 +379,7 @@ def crear_cliente(
     user_id = current_user.get("id_usuario")
     user_role = current_user.get("rol")
     
-    if user_role != "admin" and cliente.id_usuario != user_id:
+    if user_role not in ["admin", "super_admin"] and cliente.id_usuario != user_id:
         raise HTTPException(
             status_code=403, 
             detail="Solo puedes crear tu propio perfil de cliente"
@@ -473,7 +473,7 @@ def obtener_cliente(
     user_id = current_user.get("id_usuario")
     user_role = current_user.get("rol")
     
-    if user_role != "admin" and cliente.id_usuario != user_id:
+    if user_role not in ["admin", "super_admin"] and cliente.id_usuario != user_id:
         raise HTTPException(
             status_code=403,
             detail="Solo puedes ver tu propio perfil"
@@ -644,7 +644,7 @@ def crear_pedido(
     user_role = current_user.get("rol")
     
     # Validar que el cliente solo pueda crear pedidos para sí mismo
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         cliente = crud.get_cliente(db, pedido.id_cliente)
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
@@ -700,7 +700,7 @@ def crear_detalle_pedido(
     user_role = current_user.get("rol")
     
     # Validar que el pedido pertenezca al usuario si es cliente
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         pedido = crud.get_pedido(db, detalle.id_pedido)
         if not pedido:
             raise HTTPException(status_code=404, detail="Pedido no encontrado")
@@ -729,6 +729,48 @@ def listar_detalles_pedido(
     """Listar todos los detalles de pedidos. Solo accesible para administradores."""
     return crud.get_detalles_pedido(db, skip=skip, limit=limit)
 
+@app.get(
+    "/usuarios/",
+    tags=["Usuarios"],
+    summary="Listar usuarios",
+    response_model=list[schemas.Usuario],
+    responses={
+        200: {"description": "Lista de usuarios"},
+        401: {"description": "No autenticado"},
+        403: {"description": "Solo administradores"}
+    }
+)
+def listar_usuarios(
+    skip: int = Query(0, ge=0, description="Número de registros a saltar (paginación)"),
+    limit: int = Query(100, ge=1, le=100, description="Número máximo de registros a retornar"),
+    rol: Optional[str] = Query(None, description="Filtrar por rol (cliente, admin, super_admin)"),
+    correo: Optional[str] = Query(None, description="Filtrar por correo (búsqueda parcial)"),
+    email_verificado: Optional[str] = Query(None, description="Filtrar por estado de verificación (S, N)"),
+    current_user: dict = Depends(require_admin()),
+    db: Session = Depends(get_db)
+):
+    """
+    Lista todos los usuarios con filtros opcionales y paginación.
+    
+    **Solo accesible para administradores.**
+    
+    Los administradores pueden ver todos los usuarios, incluyendo otros administradores,
+    pero no pueden modificar o eliminar a otros administradores.
+    
+    Filtros disponibles:
+    - **rol**: Filtrar por rol (cliente, admin, super_admin)
+    - **correo**: Búsqueda parcial por correo electrónico
+    - **email_verificado**: Filtrar por estado de verificación (S, N)
+    """
+    return crud.get_usuarios(
+        db=db,
+        skip=skip,
+        limit=limit,
+        rol=rol,
+        correo=correo,
+        email_verificado=email_verificado
+    )
+
 @app.put(
     "/usuarios/{usuario_id}",
     tags=["Usuarios"],
@@ -738,7 +780,7 @@ def listar_detalles_pedido(
         200: {"description": "Usuario actualizado exitosamente"},
         404: {"description": "Usuario no encontrado"},
         401: {"description": "No autenticado"},
-        403: {"description": "Solo administradores"}
+        403: {"description": "Solo administradores o no puedes modificar a otro administrador"}
     }
 )
 def actualizar_usuario(
@@ -750,12 +792,43 @@ def actualizar_usuario(
     """
     Actualiza un usuario existente.
     
-    **Solo accesible para administradores.**
+    **Solo accesible para administradores o super administradores.**
+    
+    **Restricciones**:
+    - **Admin**: 
+      - Puede modificar su propia cuenta
+      - Puede modificar usuarios con rol "cliente"
+      - NO puede modificar a otros administradores o super administradores
+    - **Super Admin**:
+      - Puede modificar a todos los usuarios (admin, super_admin, cliente)
+      - NO puede cambiar su propio rol (debe mantener "super_admin")
     """
-    db_usuario = crud.actualizar_usuario(db, usuario_id, usuario)
+    # Obtener el usuario a modificar
+    db_usuario = crud.get_usuario(db, usuario_id)
     if not db_usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return db_usuario
+    
+    current_user_id = current_user.get("id_usuario")
+    current_user_role = current_user.get("rol")
+    
+    # Validar restricciones para super_admin
+    if current_user_role == "super_admin":
+        # Super admin puede modificar a todos, pero no puede cambiar su propio rol
+        if usuario_id == current_user_id and usuario.rol != "super_admin":
+            raise HTTPException(
+                status_code=403,
+                detail="No puedes cambiar tu propio rol. Los super administradores deben mantener su rol."
+            )
+    # Validar restricciones para admin
+    elif current_user_role == "admin":
+        # Admin no puede modificar a otros admins o super_admins
+        if db_usuario.rol in ["admin", "super_admin"] and db_usuario.id_usuario != current_user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="No puedes modificar a otro administrador o super administrador. Solo puedes modificar tu propia cuenta o usuarios con rol 'cliente'"
+            )
+    
+    return crud.actualizar_usuario(db, usuario_id, usuario)
 
 @app.delete(
     "/usuarios/{usuario_id}",
@@ -766,7 +839,7 @@ def actualizar_usuario(
         200: {"description": "Usuario eliminado exitosamente"},
         404: {"description": "Usuario no encontrado"},
         401: {"description": "No autenticado"},
-        403: {"description": "Solo administradores"}
+        403: {"description": "Solo administradores o no puedes eliminar a otro administrador"}
     }
 )
 def eliminar_usuario(
@@ -777,12 +850,43 @@ def eliminar_usuario(
     """
     Elimina un usuario del sistema.
     
-    **Solo accesible para administradores.**
+    **Solo accesible para administradores o super administradores.**
+    
+    **Restricciones**:
+    - **Admin**: 
+      - Puede eliminar usuarios con rol "cliente"
+      - NO puede eliminar a otros administradores o super administradores
+      - NO puede eliminarse a sí mismo
+    - **Super Admin**:
+      - Puede eliminar a todos los usuarios (admin, super_admin, cliente)
+      - NO puede eliminarse a sí mismo
     """
-    db_usuario = crud.eliminar_usuario(db, usuario_id)
+    # Obtener el usuario a eliminar
+    db_usuario = crud.get_usuario(db, usuario_id)
     if not db_usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return db_usuario
+    
+    current_user_id = current_user.get("id_usuario")
+    current_user_role = current_user.get("rol")
+    
+    # Nadie puede eliminarse a sí mismo
+    if usuario_id == current_user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="No puedes eliminarte a ti mismo"
+        )
+    
+    # Validar restricciones para admin
+    if current_user_role == "admin":
+        # Admin no puede eliminar a otros admins o super_admins
+        if db_usuario.rol in ["admin", "super_admin"]:
+            raise HTTPException(
+                status_code=403,
+                detail="No puedes eliminar a otro administrador o super administrador. Solo puedes eliminar usuarios con rol 'cliente'"
+            )
+    
+    # Super admin puede eliminar a todos (excepto a sí mismo, ya validado arriba)
+    return crud.eliminar_usuario(db, usuario_id)
 
 @app.put(
     "/clientes/{cliente_id}",
@@ -808,7 +912,7 @@ def actualizar_cliente(
     user_id = current_user.get("id_usuario")
     user_role = current_user.get("rol")
     
-    if user_role != "admin" and db_cliente.id_usuario != user_id:
+    if user_role not in ["admin", "super_admin"] and db_cliente.id_usuario != user_id:
         raise HTTPException(
             status_code=403,
             detail="No tienes permisos para actualizar este cliente"
@@ -933,7 +1037,7 @@ def obtener_pedido(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         cliente = crud.get_cliente(db, db_pedido.id_cliente)
         if not cliente or cliente.id_usuario != user_id:
             raise HTTPException(
@@ -967,7 +1071,7 @@ def actualizar_pedido(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         cliente = crud.get_cliente(db, db_pedido.id_cliente)
         if not cliente or cliente.id_usuario != user_id:
             raise HTTPException(
@@ -1018,7 +1122,7 @@ def actualizar_detalle_pedido(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         pedido = crud.get_pedido(db, db_detalle.id_pedido)
         if pedido:
             cliente = crud.get_cliente(db, pedido.id_cliente)
@@ -1053,7 +1157,7 @@ def eliminar_detalle_pedido(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         pedido = crud.get_pedido(db, db_detalle.id_pedido)
         if pedido:
             cliente = crud.get_cliente(db, pedido.id_cliente)
@@ -1086,7 +1190,7 @@ def productos_de_pedido(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso si es cliente
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         pedido = crud.get_pedido(db, pedido_id)
         if not pedido:
             raise HTTPException(status_code=404, detail="Pedido no encontrado")
@@ -1147,7 +1251,7 @@ def pedidos_de_cliente(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso si es cliente
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         cliente = crud.get_cliente(db, cliente_id)
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
@@ -1179,7 +1283,7 @@ def listar_pedidos_por_estado(
     user_id = current_user.get("id_usuario")
     user_role = current_user.get("rol")
     
-    if user_role == "admin":
+    if user_role in ["admin", "super_admin"]:
         return db.query(models.Pedido).filter(models.Pedido.estado == estado).all()
     else:
         # Cliente solo ve sus propios pedidos
@@ -1218,7 +1322,7 @@ def crear_carrito(
     user_role = current_user.get("rol")
     
     # Validar que el cliente solo pueda crear carritos para sí mismo
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         cliente = crud.get_cliente(db, carrito.id_cliente)
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
@@ -1269,7 +1373,7 @@ def actualizar_carrito(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         cliente = crud.get_cliente(db, db_carrito.id_cliente)
         if not cliente or cliente.id_usuario != user_id:
             raise HTTPException(
@@ -1302,7 +1406,7 @@ def eliminar_carrito(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         cliente = crud.get_cliente(db, db_carrito.id_cliente)
         if not cliente or cliente.id_usuario != user_id:
             raise HTTPException(
@@ -1332,7 +1436,7 @@ def crear_detalle_carrito(
     user_role = current_user.get("rol")
     
     # Validar que el carrito pertenezca al usuario si es cliente
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         carrito = crud.get_carrito(db, detalle.id_carrito)
         if not carrito:
             raise HTTPException(status_code=404, detail="Carrito no encontrado")
@@ -1385,7 +1489,7 @@ def actualizar_detalle_carrito(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         carrito = crud.get_carrito(db, db_detalle.id_carrito)
         if carrito:
             cliente = crud.get_cliente(db, carrito.id_cliente)
@@ -1419,7 +1523,7 @@ def eliminar_detalle_carrito(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         carrito = crud.get_carrito(db, db_detalle.id_carrito)
         if carrito:
             cliente = crud.get_cliente(db, carrito.id_cliente)
@@ -1451,7 +1555,7 @@ def carritos_de_cliente(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso si es cliente
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         cliente = crud.get_cliente(db, cliente_id)
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
@@ -1485,7 +1589,7 @@ def productos_de_carrito(
     user_role = current_user.get("rol")
     
     # Validar propiedad del recurso si es cliente
-    if user_role != "admin":
+    if user_role not in ["admin", "super_admin"]:
         carrito = crud.get_carrito(db, carrito_id)
         if not carrito:
             raise HTTPException(status_code=404, detail="Carrito no encontrado")
@@ -1551,7 +1655,7 @@ def login(datos: dict = Body(..., example={"correo": "usuario@ejemplo.com", "con
     El token incluye:
     - `sub`: Correo del usuario
     - `id_usuario`: ID del usuario
-    - `rol`: Rol del usuario (cliente o admin)
+    - `rol`: Rol del usuario (cliente, admin o super_admin)
     """
     correo = datos.get("correo")
     contraseña = datos.get("contraseña")

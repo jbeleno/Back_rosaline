@@ -119,20 +119,24 @@ def require_role(required_roles: list[str]):
     return role_checker
 
 def require_admin():
-    """Dependency that validates the user is an administrator."""
-    return require_role(["admin"])
+    """Dependency that validates the user is an administrator or super administrator."""
+    return require_role(["admin", "super_admin"])
+
+def require_super_admin():
+    """Dependency that validates the user is a super administrator."""
+    return require_role(["super_admin"])
 
 def require_cliente():
     """Dependency that validates the user is a client."""
     return require_role(["cliente"])
 
 def require_cliente_or_admin():
-    """Dependency that validates the user is a client or administrator."""
-    return require_role(["cliente", "admin"])
+    """Dependency that validates the user is a client, administrator or super administrator."""
+    return require_role(["cliente", "admin", "super_admin"])
 
 def verify_resource_owner(resource_user_id: int, current_user: dict = Depends(get_current_user)):
     """
-    Validates that the user is the owner of the resource or is an administrator.
+    Validates that the user is the owner of the resource or is an administrator/super administrator.
     
     Args:
         resource_user_id: ID of the user who owns the resource
@@ -147,7 +151,7 @@ def verify_resource_owner(resource_user_id: int, current_user: dict = Depends(ge
     user_id = current_user.get("id_usuario")
     user_role = current_user.get("rol")
     
-    if user_role != "admin" and user_id != resource_user_id:
+    if user_role not in ["admin", "super_admin"] and user_id != resource_user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para acceder a este recurso"

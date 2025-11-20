@@ -25,7 +25,7 @@ class Usuario(Base):
     token_reset_expira = Column(TIMESTAMP, nullable=True)  # Expiración del PIN (15 minutos)
     
     __table_args__ = (
-        CheckConstraint("rol IN ('cliente', 'admin')", name="check_rol_valido"),
+        CheckConstraint("rol IN ('cliente', 'admin', 'super_admin')", name="check_rol_valido"),
         CheckConstraint("email_verificado IN ('S', 'N')", name="check_email_verificado"),
     )
 

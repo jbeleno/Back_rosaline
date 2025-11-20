@@ -46,6 +46,41 @@ def get_usuario_por_correo(db: Session, correo: str):
     """
     return db.query(models.Usuario).filter(models.Usuario.correo == correo).first()
 
+def get_usuarios(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    rol: Optional[str] = None,
+    correo: Optional[str] = None,
+    email_verificado: Optional[str] = None
+):
+    """
+    Retrieves a list of users with optional filters and pagination.
+
+    Args:
+        db (Session): Database session.
+        skip (int): Number of records to skip (pagination).
+        limit (int): Maximum number of records to return.
+        rol (str, optional): Filter by role (cliente, admin, super_admin).
+        correo (str, optional): Filter by email (partial match).
+        email_verificado (str, optional): Filter by email verification status (S, N).
+
+    Returns:
+        list[models.Usuario]: List of users matching the filters.
+    """
+    query = db.query(models.Usuario)
+    
+    if rol:
+        query = query.filter(models.Usuario.rol == rol)
+    
+    if correo:
+        query = query.filter(models.Usuario.correo.ilike(f"%{correo}%"))
+    
+    if email_verificado:
+        query = query.filter(models.Usuario.email_verificado == email_verificado)
+    
+    return query.offset(skip).limit(limit).all()
+
 def crear_usuario(db: Session, usuario: schemas.UsuarioCreate):
     """
     Creates a new user in the database with a hashed password and generates a confirmation token.

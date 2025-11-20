@@ -29,8 +29,8 @@ class UsuarioCreate(UsuarioBase):
     
     @validator('rol')
     def validar_rol(cls, v):
-        if v and v not in ['cliente', 'admin']:
-            raise ValueError('El rol debe ser "cliente" o "admin"')
+        if v and v not in ['cliente', 'admin', 'super_admin']:
+            raise ValueError('El rol debe ser "cliente", "admin" o "super_admin"')
         return v or 'cliente'
     
     class Config:
