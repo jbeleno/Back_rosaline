@@ -34,7 +34,7 @@ class UsuarioCreate(UsuarioBase):
         return v or 'cliente'
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "correo": "cliente@ejemplo.com",
                 "contraseña": "miPassword123",
@@ -123,7 +123,7 @@ class ClienteCreate(ClienteBase):
     id_usuario: int = Field(gt=0, description="ID del usuario asociado")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id_usuario": 1,
                 "nombre": "Juan",
@@ -160,7 +160,7 @@ class CategoriaBase(BaseModel):
 
 class CategoriaCreate(CategoriaBase):
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "nombre": "Pasteles",
                 "descripcion_corta": "Deliciosos pasteles artesanales",
@@ -211,7 +211,7 @@ class ProductoBase(BaseModel):
 
 class ProductoCreate(ProductoBase):
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id_categoria": 1,
                 "nombre": "Pastel de Chocolate",
@@ -271,7 +271,7 @@ class PedidoBase(BaseModel):
 
 class PedidoCreate(PedidoBase):
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id_cliente": 1,
                 "estado": "pendiente",
@@ -311,7 +311,7 @@ class DetallePedidoBase(BaseModel):
 
 class DetallePedidoCreate(DetallePedidoBase):
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id_pedido": 1,
                 "id_producto": 1,
@@ -341,7 +341,7 @@ class CarritoBase(BaseModel):
 
 class CarritoCreate(CarritoBase):
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id_cliente": 1,
                 "estado": "activo"
@@ -396,7 +396,7 @@ class DetalleCarritoBase(BaseModel):
 
 class DetalleCarritoCreate(DetalleCarritoBase):
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id_carrito": 1,
                 "id_producto": 1,
