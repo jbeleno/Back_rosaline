@@ -772,6 +772,24 @@ def listar_usuarios(
     )
 
 @app.get(
+    "/usuarios/me",
+    tags=["Usuarios"],
+    summary="Obtener usuario actual",
+    response_description="Información del usuario autenticado",
+    responses={
+        200: {"description": "Información del usuario"},
+        401: {"description": "No autenticado"}
+    }
+)
+def leer_usuarios_me(current_user: dict = Depends(get_current_user)):
+    """
+    Obtiene la información del usuario autenticado actual.
+    
+    Requiere autenticación mediante token JWT.
+    """
+    return current_user
+
+@app.get(
     "/usuarios/{usuario_id}",
     tags=["Usuarios"],
     summary="Obtener usuario por ID",
@@ -1742,24 +1760,6 @@ def login(datos: dict = Body(..., example={"correo": "usuario@ejemplo.com", "con
         "access_token": token,
         "token_type": "bearer"
     }
-
-@app.get(
-    "/usuarios/me",
-    tags=["Usuarios"],
-    summary="Obtener usuario actual",
-    response_description="Información del usuario autenticado",
-    responses={
-        200: {"description": "Información del usuario"},
-        401: {"description": "No autenticado"}
-    }
-)
-def leer_usuarios_me(current_user: dict = Depends(get_current_user)):
-    """
-    Obtiene la información del usuario autenticado actual.
-    
-    Requiere autenticación mediante token JWT.
-    """
-    return current_user
 
 # ============================================
 # ENDPOINTS DE CONFIRMACIÓN Y RECUPERACIÓN
