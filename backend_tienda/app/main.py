@@ -771,6 +771,43 @@ def listar_usuarios(
         email_verificado=email_verificado
     )
 
+@app.get(
+    "/usuarios/{usuario_id}",
+    tags=["Usuarios"],
+    summary="Obtener usuario por ID",
+    response_model=schemas.Usuario,
+    responses={
+        200: {"description": "Usuario encontrado"},
+        404: {"description": "Usuario no encontrado"},
+        401: {"description": "No autenticado"},
+        403: {"description": "Solo administradores"}
+    }
+)
+def obtener_usuario(
+    usuario_id: int = Path(..., description="ID del usuario"),
+    current_user: dict = Depends(require_admin()),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene un usuario específico por su ID.
+    
+    **Solo accesible para administradores o super administradores.**
+    
+    Retorna la misma información que GET /usuarios/, pero para un usuario específico.
+    Útil para cargar los datos de un usuario antes de actualizarlo.
+    
+    **Campos retornados**:
+    - `id_usuario`: ID del usuario
+    - `correo`: Correo electrónico
+    - `rol`: Rol del usuario (cliente, admin, super_admin)
+    - `fecha_creacion`: Fecha de creación de la cuenta
+    - `email_verificado`: Estado de verificación (S, N)
+    """
+    usuario = crud.get_usuario(db, usuario_id)
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return usuario
+
 @app.put(
     "/usuarios/{usuario_id}",
     tags=["Usuarios"],
