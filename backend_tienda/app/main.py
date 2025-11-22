@@ -181,6 +181,7 @@ app.openapi = custom_openapi
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """
     Maneja errores de validación de Pydantic y retorna mensajes claros.
+    Asegura que los headers CORS se incluyan incluso en errores de validación.
     """
     errors = []
     for error in exc.errors():
@@ -206,30 +207,63 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "type": error_type
         })
     
+    # Obtener el origen de la request para CORS
+    origin = request.headers.get("origin")
+    headers = {}
+    
+    # Si hay un origen y está en la lista permitida, agregar headers CORS
+    if origin:
+        if CORS_ORIGINS == ["*"]:
+            headers["Access-Control-Allow-Origin"] = "*"
+        elif origin in CORS_ORIGINS:
+            headers["Access-Control-Allow-Origin"] = origin
+            if ALLOW_CREDENTIALS:
+                headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
+    
     return JSONResponse(
         status_code=422,
         content={
             "detail": "Error de validación",
             "errors": errors,
             "message": f"Se encontraron {len(errors)} error(es) de validación"
-        }
+        },
+        headers=headers
     )
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """
     Maneja excepciones no controladas y retorna un error genérico.
+    Asegura que los headers CORS se incluyan incluso en errores.
     """
     import traceback
     print(f"Error no controlado: {exc}")
     print(traceback.format_exc())
+    
+    # Obtener el origen de la request para CORS
+    origin = request.headers.get("origin")
+    headers = {}
+    
+    # Si hay un origen y está en la lista permitida, agregar headers CORS
+    if origin:
+        if CORS_ORIGINS == ["*"]:
+            headers["Access-Control-Allow-Origin"] = "*"
+        elif origin in CORS_ORIGINS:
+            headers["Access-Control-Allow-Origin"] = origin
+            if ALLOW_CREDENTIALS:
+                headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
     
     return JSONResponse(
         status_code=500,
         content={
             "detail": "Error interno del servidor",
             "message": "Ha ocurrido un error inesperado. Por favor, intenta más tarde."
-        }
+        },
+        headers=headers
     )
 
 @app.get("/", tags=["Sistema"], summary="Información del API", response_description="Información básica del servicio")
@@ -1060,10 +1094,18 @@ def eliminar_cliente(
     db: Session = Depends(get_db)
 ):
     """Eliminar cliente. Solo accesible para administradores."""
-    db_cliente = crud.eliminar_cliente(db, cliente_id)
-    if not db_cliente:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    return db_cliente
+    try:
+        db_cliente = crud.eliminar_cliente(db, cliente_id)
+        if not db_cliente:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        return db_cliente
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar cliente: {str(e)}"
+        )
 
 @app.put(
     "/categorias/{categoria_id}",

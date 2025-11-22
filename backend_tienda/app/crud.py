@@ -426,12 +426,32 @@ def actualizar_cliente(db: Session, cliente_id: int, cliente: schemas.ClienteCre
     return db_cliente
 
 def eliminar_cliente(db: Session, cliente_id: int):
-    db_cliente = get_cliente(db, cliente_id)
-    if not db_cliente:
-        return None
-    db.delete(db_cliente)
-    db.commit()
-    return db_cliente
+    """
+    Elimina un cliente de la base de datos.
+    
+    Args:
+        db (Session): Database session.
+        cliente_id (int): ID del cliente a eliminar.
+    
+    Returns:
+        models.Cliente | None: Cliente eliminado o None si no existe.
+    
+    Raises:
+        HTTPException: Si hay un error al eliminar el cliente.
+    """
+    try:
+        db_cliente = get_cliente(db, cliente_id)
+        if not db_cliente:
+            return None
+        db.delete(db_cliente)
+        db.commit()
+        return db_cliente
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar cliente: {str(e)}"
+        )
 
 def get_categoria(db: Session, categoria_id: int):
     return db.query(models.Categoria).filter(models.Categoria.id_categoria == categoria_id).first()
