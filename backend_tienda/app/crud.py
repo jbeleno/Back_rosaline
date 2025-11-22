@@ -429,6 +429,9 @@ def eliminar_cliente(db: Session, cliente_id: int):
     """
     Elimina un cliente de la base de datos.
     
+    Carga la relación con Usuario antes de eliminar para evitar errores
+    de serialización después del commit (cuando el CASCADE elimina el usuario).
+    
     Args:
         db (Session): Database session.
         cliente_id (int): ID del cliente a eliminar.
@@ -440,11 +443,32 @@ def eliminar_cliente(db: Session, cliente_id: int):
         HTTPException: Si hay un error al eliminar el cliente.
     """
     try:
-        db_cliente = get_cliente(db, cliente_id)
+        from sqlalchemy.orm import joinedload
+        
+        # Cargar el cliente con la relación usuario ANTES de eliminar
+        # Esto es necesario porque el schema Cliente requiere el objeto Usuario completo
+        db_cliente = db.query(models.Cliente)\
+            .options(joinedload(models.Cliente.usuario))\
+            .filter(models.Cliente.id_cliente == cliente_id)\
+            .first()
+        
         if not db_cliente:
             return None
-        db.delete(db_cliente)
-        db.commit()
+        
+        # Separar el objeto de la sesión antes de eliminarlo
+        # Esto mantiene los datos en memoria para la serialización
+        db.expunge(db_cliente)
+        
+        # Ahora eliminamos el cliente (esto también eliminará el usuario por CASCADE)
+        db_cliente_to_delete = db.query(models.Cliente)\
+            .filter(models.Cliente.id_cliente == cliente_id)\
+            .first()
+        
+        if db_cliente_to_delete:
+            db.delete(db_cliente_to_delete)
+            db.commit()
+        
+        # Retornar el objeto expunged que tiene todos los datos en memoria
         return db_cliente
     except Exception as e:
         db.rollback()
