@@ -1525,12 +1525,57 @@ def crear_detalle_carrito(
 )
 def listar_detalles_carrito(
     skip: int = 0, 
-    limit: int = 100, 
-    current_user: dict = Depends(require_admin()),
+    limit: int = 100,
+    carrito_id: Optional[int] = Query(None, description="ID del carrito para filtrar detalles"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Listar todos los detalles de carrito. Solo accesible para administradores."""
-    return crud.get_detalles_carrito(db, skip=skip, limit=limit)
+    """
+    Listar detalles de carrito.
+    Los clientes solo pueden ver detalles de sus propios carritos.
+    Los administradores pueden ver todos los detalles.
+    Si se proporciona carrito_id, se filtran los detalles de ese carrito.
+    """
+    user_id = current_user.get("id_usuario")
+    user_role = current_user.get("rol")
+    
+    query = db.query(models.DetalleCarrito)
+    
+    # Si es cliente, filtrar solo sus carritos
+    if user_role not in ["admin", "super_admin"]:
+        # Obtener el cliente del usuario
+        cliente = db.query(models.Cliente).filter(models.Cliente.id_usuario == user_id).first()
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        
+        # Obtener los IDs de los carritos del cliente
+        carritos_cliente = db.query(models.Carrito).filter(
+            models.Carrito.id_cliente == cliente.id_cliente
+        ).all()
+        carrito_ids = [c.id_carrito for c in carritos_cliente]
+        
+        if not carrito_ids:
+            return []  # No tiene carritos
+        
+        # Filtrar detalles solo de los carritos del cliente
+        query = query.filter(models.DetalleCarrito.id_carrito.in_(carrito_ids))
+    
+    # Si se proporciona carrito_id, filtrar por ese carrito
+    if carrito_id is not None:
+        # Validar que el cliente tenga acceso a ese carrito si no es admin
+        if user_role not in ["admin", "super_admin"]:
+            carrito = crud.get_carrito(db, carrito_id)
+            if not carrito:
+                raise HTTPException(status_code=404, detail="Carrito no encontrado")
+            cliente = crud.get_cliente(db, carrito.id_cliente)
+            if not cliente or cliente.id_usuario != user_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Solo puedes ver detalles de tus propios carritos"
+                )
+        query = query.filter(models.DetalleCarrito.id_carrito == carrito_id)
+    
+    return query.offset(skip).limit(limit).all()
 
 @app.put(
     "/detalle_carrito/{detalle_id}",
