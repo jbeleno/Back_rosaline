@@ -545,12 +545,56 @@ def actualizar_producto(db: Session, producto_id: int, producto: schemas.Product
     return db_producto
 
 def eliminar_producto(db: Session, producto_id: int):
-    db_producto = get_producto(db, producto_id)
-    if not db_producto:
-        return None
-    db.delete(db_producto)
-    db.commit()
-    return db_producto
+    """
+    Elimina un producto de la base de datos.
+    
+    Carga la relación con Categoria antes de eliminar para evitar errores
+    de serialización después del commit.
+    
+    Args:
+        db (Session): Database session.
+        producto_id (int): ID del producto a eliminar.
+    
+    Returns:
+        models.Producto | None: Producto eliminado o None si no existe.
+    
+    Raises:
+        HTTPException: Si hay un error al eliminar el producto.
+    """
+    try:
+        from sqlalchemy.orm import joinedload
+        
+        # Cargar el producto con la relación categoria ANTES de eliminar
+        # Esto es necesario porque el schema Producto requiere el objeto Categoria completo
+        db_producto = db.query(models.Producto)\
+            .options(joinedload(models.Producto.categoria))\
+            .filter(models.Producto.id_producto == producto_id)\
+            .first()
+        
+        if not db_producto:
+            return None
+        
+        # Separar el objeto de la sesión antes de eliminarlo
+        # Esto mantiene los datos en memoria para la serialización
+        db.expunge(db_producto)
+        
+        # Ahora eliminamos el producto
+        db_producto_to_delete = db.query(models.Producto)\
+            .filter(models.Producto.id_producto == producto_id)\
+            .first()
+        
+        if db_producto_to_delete:
+            db.delete(db_producto_to_delete)
+            db.commit()
+        
+        # Retornar el objeto expunged que tiene todos los datos en memoria
+        return db_producto
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar producto: {str(e)}"
+        )
 
 def get_pedido(db: Session, pedido_id: int):
     return db.query(models.Pedido).filter(models.Pedido.id_pedido == pedido_id).first()
@@ -603,12 +647,56 @@ def actualizar_pedido(db: Session, pedido_id: int, pedido: schemas.PedidoCreate)
     return db_pedido
 
 def eliminar_pedido(db: Session, pedido_id: int):
-    db_pedido = get_pedido(db, pedido_id)
-    if not db_pedido:
-        return None
-    db.delete(db_pedido)
-    db.commit()
-    return db_pedido
+    """
+    Elimina un pedido de la base de datos.
+    
+    Carga la relación con Cliente antes de eliminar para evitar errores
+    de serialización después del commit.
+    
+    Args:
+        db (Session): Database session.
+        pedido_id (int): ID del pedido a eliminar.
+    
+    Returns:
+        models.Pedido | None: Pedido eliminado o None si no existe.
+    
+    Raises:
+        HTTPException: Si hay un error al eliminar el pedido.
+    """
+    try:
+        from sqlalchemy.orm import joinedload
+        
+        # Cargar el pedido con la relación cliente ANTES de eliminar
+        # Esto es necesario porque el schema Pedido requiere el objeto Cliente completo
+        db_pedido = db.query(models.Pedido)\
+            .options(joinedload(models.Pedido.cliente))\
+            .filter(models.Pedido.id_pedido == pedido_id)\
+            .first()
+        
+        if not db_pedido:
+            return None
+        
+        # Separar el objeto de la sesión antes de eliminarlo
+        # Esto mantiene los datos en memoria para la serialización
+        db.expunge(db_pedido)
+        
+        # Ahora eliminamos el pedido
+        db_pedido_to_delete = db.query(models.Pedido)\
+            .filter(models.Pedido.id_pedido == pedido_id)\
+            .first()
+        
+        if db_pedido_to_delete:
+            db.delete(db_pedido_to_delete)
+            db.commit()
+        
+        # Retornar el objeto expunged que tiene todos los datos en memoria
+        return db_pedido
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar pedido: {str(e)}"
+        )
 
 def get_detalle_pedido(db: Session, detalle_id: int):
     return db.query(models.DetallePedido).filter(models.DetallePedido.id_detalle == detalle_id).first()
@@ -675,12 +763,57 @@ def actualizar_detalle_pedido(db: Session, detalle_id: int, detalle: schemas.Det
     return db_detalle
 
 def eliminar_detalle_pedido(db: Session, detalle_id: int):
-    db_detalle = get_detalle_pedido(db, detalle_id)
-    if not db_detalle:
-        return None
-    db.delete(db_detalle)
-    db.commit()
-    return db_detalle
+    """
+    Elimina un detalle de pedido de la base de datos.
+    
+    Carga las relaciones con Pedido y Producto antes de eliminar para evitar errores
+    de serialización después del commit.
+    
+    Args:
+        db (Session): Database session.
+        detalle_id (int): ID del detalle a eliminar.
+    
+    Returns:
+        models.DetallePedido | None: Detalle eliminado o None si no existe.
+    
+    Raises:
+        HTTPException: Si hay un error al eliminar el detalle.
+    """
+    try:
+        from sqlalchemy.orm import joinedload
+        
+        # Cargar el detalle con las relaciones pedido y producto ANTES de eliminar
+        db_detalle = db.query(models.DetallePedido)\
+            .options(
+                joinedload(models.DetallePedido.pedido),
+                joinedload(models.DetallePedido.producto)
+            )\
+            .filter(models.DetallePedido.id_detalle == detalle_id)\
+            .first()
+        
+        if not db_detalle:
+            return None
+        
+        # Separar el objeto de la sesión antes de eliminarlo
+        db.expunge(db_detalle)
+        
+        # Ahora eliminamos el detalle
+        db_detalle_to_delete = db.query(models.DetallePedido)\
+            .filter(models.DetallePedido.id_detalle == detalle_id)\
+            .first()
+        
+        if db_detalle_to_delete:
+            db.delete(db_detalle_to_delete)
+            db.commit()
+        
+        # Retornar el objeto expunged que tiene todos los datos en memoria
+        return db_detalle
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar detalle de pedido: {str(e)}"
+        )
 
 def get_carritos(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Carrito).offset(skip).limit(limit).all()
@@ -728,12 +861,56 @@ def actualizar_carrito(db: Session, carrito_id: int, carrito: schemas.CarritoCre
     return db_carrito
 
 def eliminar_carrito(db: Session, carrito_id: int):
-    db_carrito = get_carrito(db, carrito_id)
-    if not db_carrito:
-        return None
-    db.delete(db_carrito)
-    db.commit()
-    return db_carrito
+    """
+    Elimina un carrito de la base de datos.
+    
+    Carga la relación con Cliente antes de eliminar para evitar errores
+    de serialización después del commit.
+    
+    Args:
+        db (Session): Database session.
+        carrito_id (int): ID del carrito a eliminar.
+    
+    Returns:
+        models.Carrito | None: Carrito eliminado o None si no existe.
+    
+    Raises:
+        HTTPException: Si hay un error al eliminar el carrito.
+    """
+    try:
+        from sqlalchemy.orm import joinedload
+        
+        # Cargar el carrito con la relación cliente ANTES de eliminar
+        # Esto es necesario porque el schema Carrito requiere el objeto Cliente completo
+        db_carrito = db.query(models.Carrito)\
+            .options(joinedload(models.Carrito.cliente))\
+            .filter(models.Carrito.id_carrito == carrito_id)\
+            .first()
+        
+        if not db_carrito:
+            return None
+        
+        # Separar el objeto de la sesión antes de eliminarlo
+        # Esto mantiene los datos en memoria para la serialización
+        db.expunge(db_carrito)
+        
+        # Ahora eliminamos el carrito
+        db_carrito_to_delete = db.query(models.Carrito)\
+            .filter(models.Carrito.id_carrito == carrito_id)\
+            .first()
+        
+        if db_carrito_to_delete:
+            db.delete(db_carrito_to_delete)
+            db.commit()
+        
+        # Retornar el objeto expunged que tiene todos los datos en memoria
+        return db_carrito
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar carrito: {str(e)}"
+        )
 
 def get_detalles_carrito(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.DetalleCarrito).offset(skip).limit(limit).all()
@@ -880,12 +1057,57 @@ def actualizar_detalle_carrito(db: Session, detalle_id: int, detalle: schemas.De
     return db_detalle
 
 def eliminar_detalle_carrito(db: Session, detalle_id: int):
-    db_detalle = get_detalle_carrito(db, detalle_id)
-    if not db_detalle:
-        return None
-    db.delete(db_detalle)
-    db.commit()
-    return db_detalle
+    """
+    Elimina un detalle de carrito de la base de datos.
+    
+    Carga las relaciones con Carrito y Producto antes de eliminar para evitar errores
+    de serialización después del commit.
+    
+    Args:
+        db (Session): Database session.
+        detalle_id (int): ID del detalle a eliminar.
+    
+    Returns:
+        models.DetalleCarrito | None: Detalle eliminado o None si no existe.
+    
+    Raises:
+        HTTPException: Si hay un error al eliminar el detalle.
+    """
+    try:
+        from sqlalchemy.orm import joinedload
+        
+        # Cargar el detalle con las relaciones carrito y producto ANTES de eliminar
+        db_detalle = db.query(models.DetalleCarrito)\
+            .options(
+                joinedload(models.DetalleCarrito.carrito),
+                joinedload(models.DetalleCarrito.producto)
+            )\
+            .filter(models.DetalleCarrito.id_detalle_carrito == detalle_id)\
+            .first()
+        
+        if not db_detalle:
+            return None
+        
+        # Separar el objeto de la sesión antes de eliminarlo
+        db.expunge(db_detalle)
+        
+        # Ahora eliminamos el detalle
+        db_detalle_to_delete = db.query(models.DetalleCarrito)\
+            .filter(models.DetalleCarrito.id_detalle_carrito == detalle_id)\
+            .first()
+        
+        if db_detalle_to_delete:
+            db.delete(db_detalle_to_delete)
+            db.commit()
+        
+        # Retornar el objeto expunged que tiene todos los datos en memoria
+        return db_detalle
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al eliminar detalle de carrito: {str(e)}"
+        )
 
 def get_cliente_por_id_usuario(db: Session, id_usuario: int):
     return db.query(models.Cliente).filter(models.Cliente.id_usuario == id_usuario).first()
