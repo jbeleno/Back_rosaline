@@ -659,26 +659,42 @@ def crear_pedido(
 @app.get(
     "/pedidos/",
     tags=["Pedidos"],
-    summary="Listar todos los pedidos",
+    summary="Listar pedidos",
     response_model=list[schemas.Pedido],
     responses={
         200: {"description": "Lista de pedidos"},
         401: {"description": "No autenticado"},
-        403: {"description": "Solo administradores"}
+        403: {"description": "No tienes permisos para acceder a este recurso"}
     }
 )
 def listar_pedidos(
     skip: int = Query(0, ge=0, description="Número de registros a saltar (paginación)"),
     limit: int = Query(100, ge=1, le=100, description="Número máximo de registros a retornar"),
-    current_user: dict = Depends(require_admin()),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Lista todos los pedidos del sistema.
-    
-    **Solo accesible para administradores.**
+    Listar pedidos.
+    Los clientes solo pueden ver sus propios pedidos.
+    Los administradores pueden ver todos los pedidos.
     """
-    return crud.get_pedidos(db, skip=skip, limit=limit)
+    user_id = current_user.get("id_usuario")
+    user_role = current_user.get("rol")
+    
+    # Si es admin o super_admin, devolver todos los pedidos
+    if user_role in ["admin", "super_admin"]:
+        return crud.get_pedidos(db, skip=skip, limit=limit)
+    
+    # Si es cliente, filtrar solo sus pedidos
+    cliente = db.query(models.Cliente).filter(models.Cliente.id_usuario == user_id).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    
+    return db.query(models.Pedido)\
+        .filter(models.Pedido.id_cliente == cliente.id_cliente)\
+        .offset(skip)\
+        .limit(limit)\
+        .all()
 
 @app.post(
     "/detalle_pedidos/",
@@ -722,12 +738,57 @@ def crear_detalle_pedido(
 )
 def listar_detalles_pedido(
     skip: int = 0, 
-    limit: int = 100, 
-    current_user: dict = Depends(require_admin()),
+    limit: int = 100,
+    pedido_id: Optional[int] = Query(None, description="ID del pedido para filtrar detalles"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Listar todos los detalles de pedidos. Solo accesible para administradores."""
-    return crud.get_detalles_pedido(db, skip=skip, limit=limit)
+    """
+    Listar detalles de pedidos.
+    Los clientes solo pueden ver detalles de sus propios pedidos.
+    Los administradores pueden ver todos los detalles.
+    Si se proporciona pedido_id, se filtran los detalles de ese pedido.
+    """
+    user_id = current_user.get("id_usuario")
+    user_role = current_user.get("rol")
+    
+    query = db.query(models.DetallePedido)
+    
+    # Si es cliente, filtrar solo sus pedidos
+    if user_role not in ["admin", "super_admin"]:
+        # Obtener el cliente del usuario
+        cliente = db.query(models.Cliente).filter(models.Cliente.id_usuario == user_id).first()
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        
+        # Obtener los IDs de los pedidos del cliente
+        pedidos_cliente = db.query(models.Pedido).filter(
+            models.Pedido.id_cliente == cliente.id_cliente
+        ).all()
+        pedido_ids = [p.id_pedido for p in pedidos_cliente]
+        
+        if not pedido_ids:
+            return []  # No tiene pedidos
+        
+        # Filtrar detalles solo de los pedidos del cliente
+        query = query.filter(models.DetallePedido.id_pedido.in_(pedido_ids))
+    
+    # Si se proporciona pedido_id, filtrar por ese pedido
+    if pedido_id is not None:
+        # Validar que el cliente tenga acceso a ese pedido si no es admin
+        if user_role not in ["admin", "super_admin"]:
+            pedido = crud.get_pedido(db, pedido_id)
+            if not pedido:
+                raise HTTPException(status_code=404, detail="Pedido no encontrado")
+            cliente = crud.get_cliente(db, pedido.id_cliente)
+            if not cliente or cliente.id_usuario != user_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Solo puedes ver detalles de tus propios pedidos"
+                )
+        query = query.filter(models.DetallePedido.id_pedido == pedido_id)
+    
+    return query.offset(skip).limit(limit).all()
 
 @app.get(
     "/usuarios/",
