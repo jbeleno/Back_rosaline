@@ -8,7 +8,8 @@ from functools import lru_cache
 from typing import List
 
 from dotenv import load_dotenv
-from pydantic import BaseSettings, Field, validator
+from pydantic import Field, FieldValidationInfo, field_validator
+from pydantic_settings import BaseSettings
 
 
 load_dotenv()
@@ -43,10 +44,12 @@ class Settings(BaseSettings):
             return ["*"]
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
 
-    @validator("database_url", "secret_key")
-    def _validate_required(cls, value: str, field):  # noqa: D401
+    @field_validator("database_url", "secret_key")
+    @classmethod
+    def _validate_required(cls, value: str, info: FieldValidationInfo) -> str:  # noqa: D401
         if not value:
-            raise ValueError(f"Environment variable '{field.field_info.extra.get('env')}' debe estar configurada")
+            env_name = info.field_name.upper()
+            raise ValueError(f"Environment variable '{env_name}' debe estar configurada")
         return value
 
 
