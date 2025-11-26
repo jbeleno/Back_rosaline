@@ -13,9 +13,10 @@ from .core.config import get_settings
 
 settings = get_settings()
 
-SECRET_KEY = settings.secret_key
+# Constants moved to centralized settings
+SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 

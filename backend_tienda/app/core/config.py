@@ -5,62 +5,51 @@ throughout the app without re-reading environment variables in every module.
 """
 
 from functools import lru_cache
-from pathlib import Path
-from typing import List
+from typing import List, Optional
 
-from dotenv import load_dotenv
-from pydantic import Field, FieldValidationInfo, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-ENV_FILE = BASE_DIR / ".env"
-
-load_dotenv(dotenv_path=ENV_FILE)
 
 
 class Settings(BaseSettings):
     """Environment configuration for the FastAPI backend."""
 
+    # Pydantic-settings will automatically search for a .env file and load it.
     model_config = SettingsConfigDict(
-        case_sensitive=True,
-        env_file=str(ENV_FILE),
+        env_file=".env",
         env_file_encoding="utf-8",
+        case_sensitive=False,  # Allow matching uppercase env vars to lowercase fields
         extra="ignore",
     )
 
-    app_env: str = Field(default="development", env="APP_ENV")
-    environment: str = Field(default="development", env="ENVIRONMENT")
-    debug: bool = Field(default=False, env="DEBUG")
+    APP_ENV: str = "development"
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = False
 
-    database_url: str = Field(..., env="DATABASE_URL")
+    DATABASE_URL: str
+    SECRET_KEY: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-    secret_key: str = Field(..., env="SECRET_KEY")
-    access_token_expire_minutes: int = Field(default=60, env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    # Pydantic will automatically read CORS_ORIGINS and assign it here
+    CORS_ORIGINS: str = "*"
 
-    cors_origins_raw: str = Field(default="*", env="CORS_ORIGINS")
-
-    project_name: str = Field(default="API Rosaline Bakery", env="PROJECT_NAME")
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
-    frontend_url: str | None = Field(default=None, env="FRONTEND_URL")
+    PROJECT_NAME: str = "API Rosaline Bakery"
+    LOG_LEVEL: str = "INFO"
+    FRONTEND_URL: Optional[str] = None
 
     @property
-    def cors_origins(self) -> List[str]:
+    def cors_origins_list(self) -> List[str]:
         """Return the list of CORS origins based on configuration."""
-        if not self.cors_origins_raw or self.cors_origins_raw.strip() == "*":
+        if not self.CORS_ORIGINS or self.CORS_ORIGINS.strip() == "*":
             return ["*"]
-        return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
-
-    @field_validator("database_url", "secret_key")
-    @classmethod
-    def _validate_required(cls, value: str, info: FieldValidationInfo) -> str:  # noqa: D401
-        if not value:
-            env_name = info.field_name.upper()
-            raise ValueError(f"Environment variable '{env_name}' debe estar configurada")
-        return value
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Return cached settings instance."""
+    """Return cached settings instance.
+    
+    This function is decorated with @lru_cache to ensure the Settings object
+    is created only once, improving performance.
+    """
     return Settings()
