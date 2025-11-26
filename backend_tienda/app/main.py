@@ -26,7 +26,7 @@ from .routers import (
     detalle_pedidos, 
     carritos, 
     detalle_carritos, 
-    audit
+    audit as audit_router
 )
 from .core.config import get_settings
 
@@ -328,7 +328,7 @@ app.include_router(pedidos.router)
 app.include_router(detalle_pedidos.router)
 app.include_router(carritos.router)
 app.include_router(detalle_carritos.router)
-app.include_router(audit.router)
+app.include_router(audit_router.router)
 
 @app.get("/", tags=["Sistema"], summary="Información del API")
 def root():
