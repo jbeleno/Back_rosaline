@@ -4,6 +4,7 @@ from .. import schemas
 from ..services.categoria_service import CategoriaService
 from ..core.dependencies import get_categoria_repository
 from ..auth import require_admin
+from ..services.producto_service import ProductoService
 
 router = APIRouter(
     prefix="/categorias",
@@ -35,6 +36,15 @@ def obtener_categoria(
     service: CategoriaService = Depends(get_categoria_service)
 ):
     return service.obtener_categoria(categoria_id)
+
+@router.get("/{categoria_id}/productos", response_model=List[schemas.Producto], summary="Obtener productos de una categoría")
+def obtener_productos_de_categoria(
+    categoria_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    producto_service: ProductoService = Depends(get_producto_service)
+):
+    return producto_service.listar_productos_por_categoria(categoria_id, skip, limit)
 
 @router.put("/{categoria_id}", summary="Actualizar categoría", response_model=schemas.Categoria)
 def actualizar_categoria(

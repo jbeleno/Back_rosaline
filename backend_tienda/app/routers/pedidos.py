@@ -4,6 +4,8 @@ from .. import schemas
 from ..services.pedido_service import PedidoService
 from ..core.dependencies import get_pedido_repository, get_cliente_repository
 from ..auth import get_current_user, require_admin, require_cliente_or_admin
+from ..services.detalle_pedido_service import DetallePedidoService
+from ..core.dependencies import get_detalle_pedido_repository
 
 router = APIRouter(
     prefix="/pedidos",
@@ -58,10 +60,20 @@ def eliminar_pedido(
 ):
     return service.eliminar_pedido(pedido_id)
 
-@router.get("/estado/{estado}", summary="Listar pedidos por estado", response_model=List[schemas.Pedido])
+@router.get("/estado/{estado}", response_model=List[schemas.Pedido], summary="Listar pedidos por estado")
 def listar_pedidos_por_estado(
     estado: str,
+    skip: int = 0,
+    limit: int = 100,
     current_user: dict = Depends(get_current_user),
     service: PedidoService = Depends(get_pedido_service)
 ):
-    return service.listar_pedidos_por_estado(estado, current_user)
+    return service.listar_pedidos_por_estado(estado, current_user, skip, limit)
+
+@router.get("/{pedido_id}/productos", response_model=List[schemas.Producto], summary="Obtener productos de un pedido")
+def obtener_productos_de_pedido(
+    pedido_id: int,
+    current_user: dict = Depends(get_current_user),
+    service: DetallePedidoService = Depends(get_detalle_pedido_service)
+):
+    return service.listar_productos_por_pedido(pedido_id, current_user)

@@ -1,10 +1,11 @@
 """Service layer for cart-related business logic."""
 from fastapi import HTTPException, status
-from typing import Optional
+from typing import Optional, List
 from ..repositories.carrito_repository import CarritoRepository
 from ..repositories.cliente_repository import ClienteRepository
 from .. import schemas
 from .cliente_service import ClienteService
+from ..models import Carrito
 
 class CarritoService:
     def __init__(self, carrito_repository: CarritoRepository, cliente_repository: ClienteRepository):
@@ -43,6 +44,19 @@ class CarritoService:
     def listar_carritos(self, skip: int, limit: int):
         return self.carrito_repository.list(skip, limit)
     
+    def listar_carritos_por_cliente(self, cliente_id: int, current_user: dict, skip: int, limit: int) -> List[Carrito]:
+        cliente = self.cliente_repository.get_by_id(cliente_id)
+        if not cliente:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
+        
+        es_admin = current_user.get("rol") in ["admin", "super_admin"]
+        if not es_admin:
+            auth_user_cliente = self.cliente_repository.get_by_usuario_id(current_user.get("id_usuario"))
+            if not auth_user_cliente or auth_user_cliente.id_cliente != cliente_id:
+                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permisos para ver los carritos de este cliente")
+
+        return self.carrito_repository.get_by_cliente_id(cliente_id, skip, limit)
+
     def actualizar_carrito(self, carrito_id: int, carrito_update: schemas.CarritoCreate, current_user: dict):
         self._validar_permiso_carrito(carrito_id, current_user)
         return self.carrito_repository.update(carrito_id, carrito_update)

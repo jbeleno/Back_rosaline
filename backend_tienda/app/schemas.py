@@ -472,3 +472,14 @@ class AuditLog(AuditLogBase):
     
     class Config:
         from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    correo: Optional[str] = None
+
+class LoginRequest(BaseModel):
+    correo: EmailStr
+    contraseña: str

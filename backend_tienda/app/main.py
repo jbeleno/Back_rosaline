@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from . import models
-from .database import engine
+from .database import engine, Base
 from .audit import set_audit_context, clear_audit_context
 from .auth import verificar_token
 from .routers import (
@@ -26,7 +26,8 @@ from .routers import (
     detalle_pedidos, 
     carritos, 
     detalle_carritos, 
-    audit as audit_router
+    audit as audit_router,
+    auth
 )
 from .core.config import get_settings
 
@@ -319,6 +320,7 @@ def get_db():
         db.close()
 
 # Inclusión de routers
+app.include_router(auth.router)
 app.include_router(usuarios.router)
 app.include_router(usuarios.auth_router)
 app.include_router(clientes.router)
@@ -330,6 +332,14 @@ app.include_router(carritos.router)
 app.include_router(detalle_carritos.router)
 app.include_router(audit_router.router)
 
+@app.get("/health", tags=["Sistema"], summary="Health check del servicio")
+def health_check():
+    """
+    Endpoint de health check para verificar que el servicio está activo.
+    Utilizado por sistemas de monitoreo.
+    """
+    return {"status": "healthy", "service": "backend-tienda"}
+
 @app.get("/", tags=["Sistema"], summary="Información del API")
 def root():
     return {
@@ -338,11 +348,4 @@ def root():
         "service": "backend-tienda",
         "docs": "/docs",
         "health": "/health"
-    }
-
-@app.get("/health", tags=["Sistema"], summary="Health Check")
-def health_check():
-    return {
-        "status": "healthy",
-        "service": "backend-tienda"
     }

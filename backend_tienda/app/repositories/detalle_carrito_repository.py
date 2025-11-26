@@ -11,6 +11,12 @@ class DetalleCarritoRepository(Repository):
     def get(self, detalle_id: int) -> Optional[models.DetalleCarrito]:
         return self.session.query(models.DetalleCarrito).filter(models.DetalleCarrito.id_detalle_carrito == detalle_id).first()
 
+    def get_by_carrito_id(self, carrito_id: int, skip: int = 0, limit: int = 100) -> List[models.DetalleCarrito]:
+        return self.session.query(models.DetalleCarrito).filter(models.DetalleCarrito.id_carrito == carrito_id).offset(skip).limit(limit).all()
+
+    def get_productos_by_carrito_id(self, carrito_id: int) -> List[models.Producto]:
+        return self.session.query(models.Producto).join(models.DetalleCarrito).filter(models.DetalleCarrito.id_carrito == carrito_id).all()
+
     def create(self, detalle: schemas.DetalleCarritoCreate) -> models.DetalleCarrito:
         db_detalle = models.DetalleCarrito(**detalle.model_dump())
         self.add(db_detalle)

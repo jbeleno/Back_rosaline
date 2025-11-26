@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, List
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .. import crud, models, schemas
 from .base import Repository
@@ -16,10 +16,16 @@ class ClienteRepository(Repository):
     def __init__(self, session: Session):
         super().__init__(session)
 
-    def list(self, skip: int = 0, limit: int = 100):
-        return crud.get_clientes(self.session, skip=skip, limit=limit)
+    def get_by_id(self, cliente_id: int) -> Optional[models.Cliente]:
+        return self.session.query(models.Cliente).options(joinedload(models.Cliente.usuario)).filter(models.Cliente.id_cliente == cliente_id).first()
 
-    def create(self, cliente: schemas.ClienteCreate) -> models.Cliente:
+    def get_by_usuario_id(self, usuario_id: int) -> Optional[models.Cliente]:
+        return self.session.query(models.Cliente).options(joinedload(models.Cliente.usuario)).filter(models.Cliente.id_usuario == usuario_id).first()
+
+    def list(self, skip: int = 0, limit: int = 100) -> List[models.Cliente]:
+        return self.session.query(models.Cliente).options(joinedload(models.Cliente.usuario)).offset(skip).limit(limit).all()
+
+    def create(self, cliente: schemas.ClienteCreate, usuario_id: int) -> models.Cliente:
         return crud.crear_cliente(self.session, cliente)
 
     def get(self, cliente_id: int) -> Optional[models.Cliente]:

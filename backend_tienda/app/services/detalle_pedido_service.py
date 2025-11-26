@@ -1,10 +1,11 @@
 """Service layer for order detail-related business logic."""
 from fastapi import HTTPException, status
-from typing import Optional
+from typing import Optional, List
 from ..repositories.detalle_pedido_repository import DetallePedidoRepository
 from ..repositories.pedido_repository import PedidoRepository
 from ..repositories.cliente_repository import ClienteRepository
 from .. import schemas
+from .. import models
 
 class DetallePedidoService:
     def __init__(self, detalle_pedido_repository: DetallePedidoRepository, pedido_repository: PedidoRepository, cliente_repository: ClienteRepository):
@@ -70,6 +71,11 @@ class DetallePedidoService:
         
         self._validar_permiso_pedido(db_detalle.id_pedido, current_user)
         return self.detalle_pedido_repository.delete(detalle_id)
+
+    def listar_productos_por_pedido(self, pedido_id: int, current_user: dict) -> List[models.Producto]:
+        # Security check is implicitly handled by get_pedido
+        self.get_pedido(pedido_id, current_user) 
+        return self.detalle_pedido_repository.get_productos_by_pedido_id(pedido_id)
 
     def productos_de_pedido(self, pedido_id: int, current_user: dict):
         self._validar_permiso_pedido(pedido_id, current_user)

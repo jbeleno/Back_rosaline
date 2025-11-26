@@ -2,6 +2,8 @@
 from fastapi import HTTPException, status
 from ..repositories.cliente_repository import ClienteRepository
 from .. import schemas
+from typing import Optional
+from ..models import Cliente
 
 class ClienteService:
     def __init__(self, cliente_repository: ClienteRepository):
@@ -54,4 +56,10 @@ class ClienteService:
         db_cliente = self.cliente_repository.delete(cliente_id)
         if not db_cliente:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
+        return db_cliente
+
+    def get_cliente_by_usuario_id(self, usuario_id: int) -> Optional[Cliente]:
+        db_cliente = self.cliente_repository.get_by_usuario_id(usuario_id)
+        if not db_cliente:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil de cliente no encontrado para este usuario")
         return db_cliente

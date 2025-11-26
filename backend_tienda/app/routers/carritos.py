@@ -4,6 +4,7 @@ from .. import schemas
 from ..services.carrito_service import CarritoService
 from ..core.dependencies import get_carrito_repository, get_cliente_repository
 from ..auth import get_current_user, require_admin, require_cliente_or_admin
+from ..services.detalle_carrito_service import DetalleCarritoService
 
 router = APIRouter(
     prefix="/carritos",
@@ -32,6 +33,22 @@ def listar_carritos(
     service: CarritoService = Depends(get_carrito_service)
 ):
     return service.listar_carritos(skip, limit)
+
+@router.get("/{carrito_id}", summary="Obtener carrito por ID", response_model=schemas.Carrito)
+def get_carrito(
+    carrito_id: int,
+    current_user: dict = Depends(get_current_user),
+    service: CarritoService = Depends(get_carrito_service)
+):
+    return service.get_carrito(carrito_id, current_user)
+
+@router.get("/{carrito_id}/productos", response_model=List[schemas.Producto], summary="Obtener productos de un carrito")
+def obtener_productos_de_carrito(
+    carrito_id: int,
+    current_user: dict = Depends(get_current_user),
+    service: DetalleCarritoService = Depends(get_detalle_carrito_service)
+):
+    return service.listar_productos_por_carrito(carrito_id, current_user)
 
 @router.put("/{carrito_id}", summary="Actualizar carrito", response_model=schemas.Carrito)
 def actualizar_carrito(

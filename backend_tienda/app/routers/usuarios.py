@@ -3,16 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body, Query, Path
 from typing import List, Optional
 from .. import schemas
 from ..services.usuario_service import UsuarioService
-from ..core.dependencies import get_usuario_repository
+from ..core.dependencies import get_usuario_service, get_usuario_repository
 from ..auth import get_current_user, require_admin
 
 router = APIRouter(
     prefix="/usuarios",
     tags=["Usuarios"]
 )
-
-def get_usuario_service(repo=Depends(get_usuario_repository)) -> UsuarioService:
-    return UsuarioService(repo)
 
 @router.post("/", summary="Registrar nuevo usuario", status_code=status.HTTP_201_CREATED, response_model=schemas.Usuario)
 def crear_usuario(

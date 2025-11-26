@@ -28,11 +28,13 @@ def listar_audit_logs(
         db, skip, limit, tabla_nombre, registro_id, accion, usuario_id, fecha_desde, fecha_hasta
     )
 
-@router.get("/{tabla_nombre}/{registro_id}", summary="Obtener historial de un registro", response_model=List[schemas.AuditLog])
+@router.get("/{tabla_nombre}/{registro_id}", response_model=List[schemas.AuditLog], summary="Obtener historial de un registro específico")
 def obtener_historial_registro(
-    tabla_nombre: str = Path(...),
-    registro_id: int = Path(...),
+    tabla_nombre: str,
+    registro_id: int,
+    skip: int = 0,
+    limit: int = 100,
     current_user: dict = Depends(require_admin),
-    db: Session = Depends(get_db)
+    service: AuditLogService = Depends(get_audit_log_service)
 ):
-    return crud.get_audit_logs(db, tabla_nombre=tabla_nombre, registro_id=registro_id)
+    return service.obtener_historial_registro(tabla_nombre, registro_id, skip, limit)

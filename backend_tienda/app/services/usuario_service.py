@@ -1,12 +1,27 @@
 """Service layer for user-related business logic."""
 from fastapi import HTTPException, status
 from ..repositories.usuario_repository import UsuarioRepository
-from .. import schemas, email_service
-from ..auth import verify_password
+from .. import schemas, email_service, models
+from ..auth import verify_password, create_access_token
+from typing import Optional
+
 class UsuarioService:
     def __init__(self, usuario_repository: UsuarioRepository):
         self.usuario_repository = usuario_repository
 
+    def autenticar_usuario(self, correo: str, contraseña: str) -> Optional[models.Usuario]:
+        db_usuario = self.usuario_repository.get_by_email(correo)
+        if not db_usuario:
+            return None
+        if not verify_password(contraseña, db_usuario.contraseña_hash):
+            return None
+        if db_usuario.email_verificado != "S":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cuenta no confirmada. Por favor, verifica tu correo electrónico."
+            )
+        return db_usuario
+        
     def crear_usuario(self, usuario: schemas.UsuarioCreate):
         db_usuario = self.usuario_repository.get_by_email(correo=usuario.correo)
         if db_usuario:

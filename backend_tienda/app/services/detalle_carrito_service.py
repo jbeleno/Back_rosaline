@@ -74,3 +74,9 @@ class DetalleCarritoService:
         self._validar_permiso_carrito(carrito_id, current_user)
         detalles = self.detalle_carrito_repository.list(carrito_id=carrito_id)
         return [d.producto for d in detalles if d.producto]
+
+    def listar_productos_por_carrito(self, carrito_id: int, current_user: dict):
+        self._validar_permiso_carrito(carrito_id, current_user)
+        # Security check is implicitly handled by get_carrito
+        self.carrito_repository.get(carrito_id)
+        return self.detalle_carrito_repository.get_productos_by_carrito_id(carrito_id)
