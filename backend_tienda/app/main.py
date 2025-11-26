@@ -28,7 +28,9 @@ from .routers import (
     detalle_carritos, 
     audit
 )
-from .settings import settings
+from .core.config import get_settings
+
+settings = get_settings()
 
 # Cargar variables de entorno
 load_dotenv()
