@@ -1,36 +1,21 @@
 """
 Authentication utilities module for the API.
-
-Includes functions for:
-- Hashing and verifying passwords.
-- Creating and validating JWT tokens.
-- Retrieving the current authenticated user.
-
-Main dependencies:
-- FastAPI
-- jose
-- passlib
 """
 
-import os
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from passlib.context import CryptContext
-from dotenv import load_dotenv
 
-# Cargar variables de entorno
-load_dotenv()
+from .core.config import get_settings
 
-# Leer SECRET_KEY desde variable de entorno, con fallback para desarrollo
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:
-    raise ValueError(
-        "SECRET_KEY no está configurada. Por favor, configura la variable de entorno SECRET_KEY."
-    )
+settings = get_settings()
+
+SECRET_KEY = settings.secret_key
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
@@ -41,6 +26,7 @@ pwd_context = CryptContext(
     deprecated="auto",
     bcrypt__rounds=12
 )
+
 
 def crear_token_de_acceso(data: dict, expires_delta: timedelta = None):
     """
@@ -62,6 +48,7 @@ def crear_token_de_acceso(data: dict, expires_delta: timedelta = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+
 def verificar_token(token: str):
     """
     Decodes and validates a JWT token.
@@ -77,6 +64,7 @@ def verificar_token(token: str):
         return payload
     except JWTError:
         return None
+
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     """
@@ -98,6 +86,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         )
     return payload
 
+
 def require_role(required_roles: list[str]):
     """
     Dependency factory that validates the user has one of the required roles.
@@ -118,21 +107,26 @@ def require_role(required_roles: list[str]):
         return current_user
     return role_checker
 
+
 def require_admin():
     """Dependency that validates the user is an administrator or super administrator."""
     return require_role(["admin", "super_admin"])
+
 
 def require_super_admin():
     """Dependency that validates the user is a super administrator."""
     return require_role(["super_admin"])
 
+
 def require_cliente():
     """Dependency that validates the user is a client."""
     return require_role(["cliente"])
 
+
 def require_cliente_or_admin():
     """Dependency that validates the user is a client, administrator or super administrator."""
     return require_role(["cliente", "admin", "super_admin"])
+
 
 def verify_resource_owner(resource_user_id: int, current_user: dict = Depends(get_current_user)):
     """
@@ -158,6 +152,7 @@ def verify_resource_owner(resource_user_id: int, current_user: dict = Depends(ge
         )
     return current_user
 
+
 def hash_password(password: str) -> str:
     """
     Hashes a plain text password using bcrypt.
@@ -170,6 +165,7 @@ def hash_password(password: str) -> str:
     """
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Checks if a plain text password matches the hashed password.
@@ -181,4 +177,29 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         bool: True if they match, False otherwise.
     """
-    return pwd_context.verify(plain_password, hashed_password) 
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+class AuthService:
+    """Servicio de apoyo para operaciones de autenticación y seguridad."""
+
+    def __init__(self):
+        self._secret_key = SECRET_KEY
+        self._algorithm = ALGORITHM
+        self._access_token_expire_minutes = ACCESS_TOKEN_EXPIRE_MINUTES
+
+    def hash_password(self, password: str) -> str:
+        return hash_password(password)
+
+    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
+        return verify_password(plain_password, hashed_password)
+
+    def create_access_token(self, data: dict, expires_delta: timedelta | None = None) -> str:
+        return crear_token_de_acceso(data, expires_delta)
+
+    def decode_token(self, token: str) -> dict | None:
+        return verificar_token(token)
+
+    @property
+    def access_token_expire_minutes(self) -> int:
+        return self._access_token_expire_minutes
