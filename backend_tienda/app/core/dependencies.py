@@ -18,6 +18,7 @@ from ..repositories.pedido_repository import PedidoRepository
 from ..repositories.producto_repository import ProductoRepository
 from ..repositories.usuario_repository import UsuarioRepository
 from ..repositories.detalle_pedido_repository import DetallePedidoRepository
+from ..repositories.detalle_carrito_repository import DetalleCarritoRepository
 from ..services.carrito_service import CarritoService
 from ..services.categoria_service import CategoriaService
 from ..services.cliente_service import ClienteService
@@ -66,6 +67,9 @@ def get_detalle_pedido_repository(db: Session = Depends(get_db)) -> DetallePedid
 
 def get_carrito_repository(db: Session = Depends(get_db)) -> CarritoRepository:
     return CarritoRepository(db)
+
+def get_detalle_carrito_repository(db: Session = Depends(get_db)) -> DetalleCarritoRepository:
+    return DetalleCarritoRepository(db)
 
 
 def get_usuario_service(
