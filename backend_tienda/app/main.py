@@ -28,6 +28,7 @@ from .routers import (
     detalle_carritos, 
     audit
 )
+from .settings import settings
 
 # Cargar variables de entorno
 load_dotenv()
@@ -135,23 +136,13 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# Configurar CORS desde variables de entorno
-# Por defecto permite todos los orígenes para desarrollo
-# En producción, configurar CORS_ORIGINS con los orígenes específicos del frontend
-CORS_ORIGINS_ENV = os.getenv("CORS_ORIGINS", "*")
-if CORS_ORIGINS_ENV == "*" or CORS_ORIGINS_ENV == "":
-    CORS_ORIGINS = ["*"]
-    # Cuando se usa "*", no se pueden usar credenciales (restricción de CORS)
-    ALLOW_CREDENTIALS = False
-else:
-    CORS_ORIGINS = [origin.strip() for origin in CORS_ORIGINS_ENV.split(",")]
-    # Con orígenes específicos, se pueden usar credenciales
-    ALLOW_CREDENTIALS = True
+# Configurar CORS usando la nueva propiedad de la clase Settings
+CORS_ORIGINS = settings.cors_origins_list
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_credentials=ALLOW_CREDENTIALS,
+    allow_credentials=True, # Assuming credentials are allowed for all origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -220,13 +211,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     origin = request.headers.get("origin")
     headers = {}
     
-    # Si hay un origen y está en la lista permitida, agregar headers CORS
+    # Actualizar la lógica de CORS para usar la nueva lista de orígenes
     if origin:
-        if CORS_ORIGINS == ["*"]:
+        if "*" in CORS_ORIGINS:
             headers["Access-Control-Allow-Origin"] = "*"
         elif origin in CORS_ORIGINS:
             headers["Access-Control-Allow-Origin"] = origin
-            if ALLOW_CREDENTIALS:
+            if True: # Assuming ALLOW_CREDENTIALS is now always True for all origins
                 headers["Access-Control-Allow-Credentials"] = "true"
         headers["Access-Control-Allow-Methods"] = "*"
         headers["Access-Control-Allow-Headers"] = "*"
@@ -255,13 +246,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     origin = request.headers.get("origin")
     headers = {}
     
-    # Si hay un origen y está en la lista permitida, agregar headers CORS
+    # Actualizar la lógica de CORS para usar la nueva lista de orígenes
     if origin:
-        if CORS_ORIGINS == ["*"]:
+        if "*" in CORS_ORIGINS:
             headers["Access-Control-Allow-Origin"] = "*"
         elif origin in CORS_ORIGINS:
             headers["Access-Control-Allow-Origin"] = origin
-            if ALLOW_CREDENTIALS:
+            if True: # Assuming ALLOW_CREDENTIALS is now always True for all origins
                 headers["Access-Control-Allow-Credentials"] = "true"
         headers["Access-Control-Allow-Methods"] = "*"
         headers["Access-Control-Allow-Headers"] = "*"

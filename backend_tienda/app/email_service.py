@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -10,20 +9,23 @@ from typing import Optional
 
 from .core.config import get_settings
 
+settings = get_settings()
 
 class EmailService:
     """Servicio para el envío de correos electrónicos transaccionales."""
 
     def __init__(self):
-        settings = get_settings()
+        # Cargar configuración desde el objeto centralizado de Settings
+        self.smtp_host = settings.SMTP_HOST
+        self.smtp_port = settings.SMTP_PORT
+        self.smtp_user = settings.SMTP_USER
+        self.smtp_password = settings.SMTP_PASSWORD
+        self.smtp_from_email = settings.SMTP_FROM_EMAIL
+        self.smtp_from_name = settings.SMTP_FROM_NAME or settings.PROJECT_NAME
+        self.frontend_url = settings.FRONTEND_URL
 
-        self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        self.smtp_user = os.getenv("SMTP_USER")
-        self.smtp_password = os.getenv("SMTP_PASSWORD")
-        self.smtp_from_email = os.getenv("SMTP_FROM_EMAIL", self.smtp_user)
-        self.smtp_from_name = os.getenv("SMTP_FROM_NAME", settings.project_name)
-        self.frontend_url = os.getenv("FRONTEND_URL", "https://rosalinebakery.me")
+        if not all([self.smtp_host, self.smtp_port, self.smtp_user, self.smtp_password, self.smtp_from_email]):
+            raise ValueError("La configuración de SMTP no está completa. Revisa las variables de entorno.")
 
     def send_email(
         self,
