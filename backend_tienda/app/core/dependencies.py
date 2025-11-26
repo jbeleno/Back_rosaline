@@ -17,6 +17,7 @@ from ..repositories.cliente_repository import ClienteRepository
 from ..repositories.pedido_repository import PedidoRepository
 from ..repositories.producto_repository import ProductoRepository
 from ..repositories.usuario_repository import UsuarioRepository
+from ..repositories.detalle_pedido_repository import DetallePedidoRepository
 from ..services.carrito_service import CarritoService
 from ..services.categoria_service import CategoriaService
 from ..services.cliente_service import ClienteService
@@ -25,6 +26,7 @@ from ..services.producto_service import ProductoService
 from ..services.usuario_service import UsuarioService
 
 
+# Dependencia para obtener la sesión de la base de datos
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
@@ -43,25 +45,24 @@ def get_auth_service() -> AuthService:
     return AuthService()
 
 
+# Dependencias para obtener los repositorios
 def get_usuario_repository(db: Session = Depends(get_db)) -> UsuarioRepository:
     return UsuarioRepository(db)
-
 
 def get_cliente_repository(db: Session = Depends(get_db)) -> ClienteRepository:
     return ClienteRepository(db)
 
-
 def get_categoria_repository(db: Session = Depends(get_db)) -> CategoriaRepository:
     return CategoriaRepository(db)
-
 
 def get_producto_repository(db: Session = Depends(get_db)) -> ProductoRepository:
     return ProductoRepository(db)
 
-
 def get_pedido_repository(db: Session = Depends(get_db)) -> PedidoRepository:
     return PedidoRepository(db)
 
+def get_detalle_pedido_repository(db: Session = Depends(get_db)) -> DetallePedidoRepository:
+    return DetallePedidoRepository(db)
 
 def get_carrito_repository(db: Session = Depends(get_db)) -> CarritoRepository:
     return CarritoRepository(db)
