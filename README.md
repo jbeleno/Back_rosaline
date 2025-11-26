@@ -1,6 +1,6 @@
-# Store Backend
+# Store Backend (Rosaline Bakery)
 
-This is a backend developed with **FastAPI** for managing an online store. It allows the administration of users, clients, products, categories, orders, and shopping carts, integrating authentication and connection to a PostgreSQL database.
+Backend de comercio electrónico desarrollado con **FastAPI** para Rosaline Bakery. Tras la refactorización en curso, la aplicación adopta una arquitectura orientada a objetos basada en capas (configuración centralizada, repositorios, servicios y routers) conservando los mismos endpoints y contratos existentes. Permite administrar usuarios, clientes, productos, categorías, pedidos y carritos con autenticación JWT y conexión a PostgreSQL.
 
 ## Main Features
 
@@ -18,20 +18,38 @@ This is a backend developed with **FastAPI** for managing an online store. It al
 backend_tienda/
 │
 ├── app/
-│   ├── main.py           # API entry point and routes
-│   ├── models.py         # SQLAlchemy models
-│   ├── schemas.py        # Pydantic schemas
-│   ├── crud.py           # CRUD operations
-│   ├── database.py       # Database configuration
-│   ├── auth.py           # Authentication and security
-│   ├── audit.py          # Auditing system
+│   ├── core/
+│   │   ├── app.py            # FastAPI application factory (create_app)
+│   │   ├── config.py         # Centralized settings with Pydantic BaseSettings
+│   │   └── dependencies.py   # Dependency providers (DB, repos, services, utilities)
+│   ├── repositories/         # Repository layer wrapping persistence logic
+│   │   ├── base.py
+│   │   ├── usuario_repository.py
+│   │   ├── cliente_repository.py
+│   │   ├── categoria_repository.py
+│   │   ├── producto_repository.py
+│   │   ├── pedido_repository.py
+│   │   ├── detalle_pedido_repository.py
+│   │   └── carrito_repository.py
+│   ├── services/             # (En progreso) Servicios de dominio y reglas de negocio
+│   ├── main.py               # Punto de entrada legacy con endpoints actuales
+│   ├── models.py             # Modelos SQLAlchemy
+│   ├── schemas.py            # Esquemas Pydantic
+│   ├── crud.py               # Funciones CRUD legacy (en migración a repositorios)
+│   ├── database.py           # Configuración de base de datos
+│   ├── auth.py               # Autenticación y seguridad (AuthService + helpers)
+│   ├── email_service.py      # EmailService (compatibilidad con funciones legacy)
+│   ├── audit.py              # Sistema de auditoría con SQLAlchemy events
 │   └── __init__.py
-├── tests/                # Test suite
-├── requirements.txt      # Project dependencies
-├── runtime.txt          # Python version for deployment
-├── pytest.ini          # Pytest configuration
-└── Procfile             # For deployment on platforms like Heroku/Render
+├── tests/                    # Suite de pruebas (actualización pendiente)
+├── plan-refactor-poo.md      # Plan detallado de migración a arquitectura OOP
+├── requirements.txt          # Dependencias del proyecto
+├── runtime.txt               # Versión de Python para despliegue
+├── pytest.ini                # Configuración de Pytest
+└── Procfile                  # Para despliegues en plataformas como Heroku/Render
 ```
+
+> **Nota:** los endpoints permanecen en `app/main.py` hasta completar la migración a routers modulares. La documentación se irá actualizando conforme avance el plan.
 
 ## Installation
 
@@ -105,12 +123,21 @@ DB_POOL_RECYCLE=3600
 
 To start the development server:
 
+Opción recomendada (usando la factoría `create_app`):
+
+```bash
+cd backend_tienda
+uvicorn app.core.app:create_app --factory --reload
+```
+
+También puedes seguir utilizando el punto de entrada legacy mientras se completa la modularización:
+
 ```bash
 cd backend_tienda
 uvicorn app.main:app --reload
 ```
 
-The API will be available at: [http://localhost:8000](http://localhost:8000)
+La API estará disponible en [http://localhost:8000](http://localhost:8000).
 
 ## Conexión a Amazon Aurora PostgreSQL
 
