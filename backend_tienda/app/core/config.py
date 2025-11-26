@@ -9,7 +9,7 @@ from typing import List
 
 from dotenv import load_dotenv
 from pydantic import Field, FieldValidationInfo, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 load_dotenv()
@@ -17,6 +17,13 @@ load_dotenv()
 
 class Settings(BaseSettings):
     """Environment configuration for the FastAPI backend."""
+
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_env: str = Field(default="development", env="APP_ENV")
     environment: str = Field(default="development", env="ENVIRONMENT")
@@ -31,11 +38,7 @@ class Settings(BaseSettings):
 
     project_name: str = Field(default="API Rosaline Bakery", env="PROJECT_NAME")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
-
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    frontend_url: str | None = Field(default=None, env="FRONTEND_URL")
 
     @property
     def cors_origins(self) -> List[str]:
