@@ -2,7 +2,7 @@
 from fastapi import HTTPException, status
 from ..repositories.usuario_repository import UsuarioRepository
 from .. import schemas, email_service, models
-from ..auth import verify_password, create_access_token
+from ..auth import verify_password, crear_token_de_acceso
 from typing import Optional
 
 class UsuarioService:
@@ -13,7 +13,7 @@ class UsuarioService:
         db_usuario = self.usuario_repository.get_by_email(correo)
         if not db_usuario:
             return None
-        if not verify_password(contraseña, db_usuario.contraseña_hash):
+        if not verify_password(contraseña, db_usuario.contraseña):
             return None
         if db_usuario.email_verificado != "S":
             raise HTTPException(

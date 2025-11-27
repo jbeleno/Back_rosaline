@@ -20,7 +20,7 @@ def get_detalle_pedido_service(
 @router.post("/", summary="Crear detalle de pedido", status_code=status.HTTP_201_CREATED, response_model=schemas.DetallePedido)
 def crear_detalle_pedido(
     detalle: schemas.DetallePedidoCreate,
-    current_user: dict = Depends(require_cliente_or_admin),
+    current_user: dict = Depends(require_cliente_or_admin()),
     service: DetallePedidoService = Depends(get_detalle_pedido_service)
 ):
     return service.crear_detalle_pedido(detalle, current_user)

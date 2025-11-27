@@ -24,7 +24,7 @@ class PedidoService:
                 )
         return self.pedido_repository.create(pedido)
 
-    def listar_pedidos(self, current_user: dict, skip: int, limit: int) -> List[Pedido]:
+    def listar_pedidos(self, skip: int, limit: int, current_user: dict) -> List[Pedido]:
         es_admin = current_user.get("rol") in ["admin", "super_admin"]
         if es_admin:
             return self.pedido_repository.list(skip=skip, limit=limit)

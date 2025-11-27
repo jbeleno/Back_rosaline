@@ -11,8 +11,20 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["CORS_ORIGINS"] = "http://localhost:3000,http://test.local"
 
 from app.database import Base
-from app.main import app, get_db
+from app.main import app
+from app.core.dependencies import get_db
 from app import models
+
+# Importaciones de la nueva arquitectura
+from app.repositories.usuario_repository import UsuarioRepository
+from app.repositories.cliente_repository import ClienteRepository
+from app.repositories.categoria_repository import CategoriaRepository
+from app.repositories.producto_repository import ProductoRepository
+from app.services.usuario_service import UsuarioService
+from app.services.cliente_service import ClienteService
+from app.services.categoria_service import CategoriaService
+from app.services.producto_service import ProductoService
+from unittest.mock import MagicMock
 
 # Crear engine de prueba con SQLite en memoria
 engine = create_engine(
@@ -59,65 +71,105 @@ def client(db_session):
 
 @pytest.fixture
 def usuario_test(db_session):
-    """Crea un usuario de prueba."""
-    from app.crud import crear_usuario
+    """Crea un usuario de prueba usando la capa de servicio."""
     from app.schemas import UsuarioCreate
+
+    # Mock del servicio de email para evitar envíos reales
+    mock_email_service = MagicMock()
+
+    usuario_repo = UsuarioRepository(db_session)
+    usuario_service = UsuarioService(usuario_repo)
     
-    usuario = crear_usuario(
-        db_session,
+    # Sobrescribir el email_service a nivel de módulo para que el servicio lo use
+    from app.services import usuario_service as usuario_service_module
+    original_email_service = usuario_service_module.email_service
+    usuario_service_module.email_service = mock_email_service
+
+    usuario = usuario_service.crear_usuario(
         UsuarioCreate(
             correo="test@example.com",
             contraseña="password123",
             rol="cliente"
         )
     )
+    
+    # Restaurar el servicio de email original
+    usuario_service_module.email_service = original_email_service
+    
+    # Confirmar usuario para que pueda loguearse en las pruebas
+    usuario.email_verificado = "S"
+    db_session.commit()
+    db_session.refresh(usuario)
+    
     return usuario
 
 
 @pytest.fixture
 def usuario_admin_test(db_session):
-    """Crea un usuario admin de prueba."""
-    from app.crud import crear_usuario
+    """Crea un usuario admin de prueba usando la capa de servicio."""
     from app.schemas import UsuarioCreate
-    
-    usuario = crear_usuario(
-        db_session,
+
+    mock_email_service = MagicMock()
+    usuario_repo = UsuarioRepository(db_session)
+    usuario_service = UsuarioService(usuario_repo)
+
+    from app.services import usuario_service as usuario_service_module
+    original_email_service = usuario_service_module.email_service
+    usuario_service_module.email_service = mock_email_service
+
+    usuario = usuario_service.crear_usuario(
         UsuarioCreate(
             correo="admin@example.com",
             contraseña="admin123",
             rol="admin"
         )
     )
+
+    usuario_service_module.email_service = original_email_service
+    
+    usuario.email_verificado = "S"
+    db_session.commit()
+    db_session.refresh(usuario)
+    
     return usuario
 
 
 @pytest.fixture
 def cliente_test(db_session, usuario_test):
-    """Crea un cliente de prueba."""
-    from app.crud import crear_cliente
+    """Crea un cliente de prueba usando la capa de servicio."""
     from app.schemas import ClienteCreate
+
+    cliente_repo = ClienteRepository(db_session)
+    cliente_service = ClienteService(cliente_repo)
     
-    cliente = crear_cliente(
-        db_session,
+    # Para crear un cliente, el servicio espera un `current_user` (token decodificado)
+    current_user_mock = {
+        "id_usuario": usuario_test.id_usuario,
+        "rol": usuario_test.rol
+    }
+
+    cliente = cliente_service.crear_cliente(
         ClienteCreate(
             id_usuario=usuario_test.id_usuario,
             nombre="Juan",
             apellido="Pérez",
             telefono="123456789",
             direccion="Calle Test 123"
-        )
+        ),
+        current_user=current_user_mock
     )
     return cliente
 
 
 @pytest.fixture
 def categoria_test(db_session):
-    """Crea una categoría de prueba."""
-    from app.crud import crear_categoria
+    """Crea una categoría de prueba usando la capa de servicio."""
     from app.schemas import CategoriaCreate
-    
-    categoria = crear_categoria(
-        db_session,
+
+    categoria_repo = CategoriaRepository(db_session)
+    categoria_service = CategoriaService(categoria_repo)
+
+    categoria = categoria_service.crear_categoria(
         CategoriaCreate(
             nombre="Electrónica",
             descripcion_corta="Dispositivos electrónicos",
@@ -130,12 +182,13 @@ def categoria_test(db_session):
 
 @pytest.fixture
 def producto_test(db_session, categoria_test):
-    """Crea un producto de prueba."""
-    from app.crud import crear_producto
+    """Crea un producto de prueba usando la capa de servicio."""
     from app.schemas import ProductoCreate
-    
-    producto = crear_producto(
-        db_session,
+
+    producto_repo = ProductoRepository(db_session)
+    producto_service = ProductoService(producto_repo)
+
+    producto = producto_service.crear_producto(
         ProductoCreate(
             id_categoria=categoria_test.id_categoria,
             nombre="iPhone 15",
@@ -178,3 +231,44 @@ def get_auth_headers(token: str):
     """Helper para obtener headers de autenticación."""
     return {"Authorization": f"Bearer {token}"}
 
+
+@pytest.fixture
+def usuario_sin_perfil_test(db_session):
+    """Crea un usuario de prueba sin un perfil de cliente asociado."""
+    from app.schemas import UsuarioCreate
+    mock_email_service = MagicMock()
+    usuario_repo = UsuarioRepository(db_session)
+    usuario_service = UsuarioService(usuario_repo)
+    
+    from app.services import usuario_service as usuario_service_module
+    original_email_service = usuario_service_module.email_service
+    usuario_service_module.email_service = mock_email_service
+
+    usuario = usuario_service.crear_usuario(
+        UsuarioCreate(
+            correo="user.sin.perfil@example.com",
+            contraseña="password123",
+            rol="cliente"
+        )
+    )
+    
+    usuario_service_module.email_service = original_email_service
+    
+    usuario.email_verificado = "S"
+    db_session.commit()
+    db_session.refresh(usuario)
+    
+    return usuario
+
+
+@pytest.fixture
+def token_sin_perfil_test(client, usuario_sin_perfil_test):
+    """Obtiene un token para el usuario sin perfil de cliente."""
+    response = client.post(
+        "/login",
+        json={
+            "correo": usuario_sin_perfil_test.correo,
+            "contraseña": "password123"
+        }
+    )
+    return response.json()["access_token"]

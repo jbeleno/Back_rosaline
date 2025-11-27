@@ -11,6 +11,12 @@ class DetalleCarritoRepository(Repository):
     def get(self, detalle_id: int) -> Optional[models.DetalleCarrito]:
         return self.session.query(models.DetalleCarrito).filter(models.DetalleCarrito.id_detalle_carrito == detalle_id).first()
 
+    def get_by_carrito_and_producto(self, carrito_id: int, producto_id: int) -> Optional[models.DetalleCarrito]:
+        return self.session.query(models.DetalleCarrito).filter(
+            models.DetalleCarrito.id_carrito == carrito_id,
+            models.DetalleCarrito.id_producto == producto_id
+        ).first()
+
     def get_by_carrito_id(self, carrito_id: int, skip: int = 0, limit: int = 100) -> List[models.DetalleCarrito]:
         return self.session.query(models.DetalleCarrito).filter(models.DetalleCarrito.id_carrito == carrito_id).offset(skip).limit(limit).all()
 
@@ -52,6 +58,6 @@ class DetalleCarritoRepository(Repository):
             ).filter(models.DetalleCarrito.id_detalle_carrito == detalle_id).one()
             
             self.expunge(db_detalle)
-            self.delete(db_detalle)
+            self.session.delete(db_detalle)
             self.commit()
         return db_detalle

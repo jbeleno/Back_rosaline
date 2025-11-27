@@ -4,7 +4,7 @@ from datetime import timedelta
 from .. import schemas
 from ..services.usuario_service import UsuarioService
 from ..core.dependencies import get_usuario_service
-from ..auth import create_access_token
+from ..auth import crear_token_de_acceso
 from ..core.config import get_settings, Settings
 
 router = APIRouter(
@@ -29,7 +29,7 @@ def login(
         )
     
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
+    access_token = crear_token_de_acceso(
         data={"sub": user.correo, "id_usuario": user.id_usuario, "rol": user.rol},
         expires_delta=access_token_expires
     )

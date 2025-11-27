@@ -20,7 +20,7 @@ class TestCarritoEndpoints:
             headers=get_auth_headers(token_test)
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert data["estado"] == "activo"
         assert "id_carrito" in data
@@ -71,6 +71,26 @@ class TestCarritoEndpoints:
         data = response.json()
         assert isinstance(data, list)
 
+    def test_crear_carrito_falla_si_no_hay_perfil_cliente(self, client, token_sin_perfil_test):
+        """CP-004: Verifica que no se puede crear un carrito si el usuario no tiene perfil de cliente."""
+        # Se asume que la lógica de negocio requiere un `id_cliente` que se obtiene
+        # a partir del usuario autenticado. Un usuario sin perfil no tendrá cliente asociado.
+        # El endpoint podría fallar por varias razones:
+        # 1. Espera un `id_cliente` en el payload y no lo puede obtener.
+        # 2. Intenta buscar un cliente a partir del token y no lo encuentra (404).
+        # 3. Considera la acción prohibida si no hay perfil (403).
+        
+        # Simula una llamada que un frontend haría sin tener un `id_cliente`
+        response = client.post(
+            "/carritos/",
+            json={"estado": "activo"}, # No se envía id_cliente
+            headers=get_auth_headers(token_sin_perfil_test)
+        )
+        
+        # Esperamos un error, que podría ser 403 (prohibido) o 404 (cliente no encontrado)
+        # o 422 si el id_cliente es requerido explícitamente en el schema.
+        assert response.status_code in [403, 404]
+
 
 class TestDetalleCarritoEndpoints:
     """Pruebas para endpoints de detalles de carritos."""
@@ -105,7 +125,7 @@ class TestDetalleCarritoEndpoints:
             headers=get_auth_headers(token_test)
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert data["cantidad"] == cantidad
         # Usar pytest.approx para comparar números de punto flotante
@@ -233,4 +253,64 @@ class TestDetalleCarritoEndpoints:
         # El endpoint puede devolver el objeto o un mensaje
         response_data = response.json()
         assert "mensaje" in response_data or "id_detalle_carrito" in response_data
+
+    def test_agregar_producto_repetido_actualiza_cantidad(self, client, cliente_test, producto_test, token_test):
+        """CP-016: Verifica que agregar un producto existente actualiza la cantidad."""
+        # 1. Crear un carrito
+        carrito_response = client.post(
+            "/carritos/",
+            json={"id_cliente": cliente_test.id_cliente, "estado": "activo"},
+            headers=get_auth_headers(token_test)
+        )
+        assert carrito_response.status_code == 201
+        carrito_id = carrito_response.json()["id_carrito"]
+
+        # 2. Agregar el producto por primera vez
+        cantidad_inicial = 2
+        precio_unitario = float(producto_test.precio)
+        response1 = client.post(
+            "/detalle_carrito/",
+            json={
+                "id_carrito": carrito_id,
+                "id_producto": producto_test.id_producto,
+                "cantidad": cantidad_inicial,
+                "precio_unitario": precio_unitario,
+                "subtotal": cantidad_inicial * precio_unitario
+            },
+            headers=get_auth_headers(token_test)
+        )
+        assert response1.status_code == 201
+
+        # 3. Agregar el MISMO producto por segunda vez
+        cantidad_adicional = 3
+        response2 = client.post(
+            "/detalle_carrito/",
+            json={
+                "id_carrito": carrito_id,
+                "id_producto": producto_test.id_producto,
+                "cantidad": cantidad_adicional,
+                "precio_unitario": precio_unitario,
+                "subtotal": cantidad_adicional * precio_unitario
+            },
+            headers=get_auth_headers(token_test)
+        )
+        assert response2.status_code == 201
+
+        # 4. Verificar que la cantidad se ha actualizado y no hay un nuevo item
+        response_items = client.get(
+            f"/carritos/{carrito_id}/productos",
+            headers=get_auth_headers(token_test)
+        )
+        assert response_items.status_code == 200
+        items = response_items.json()
+
+        # Debe haber solo un item en el carrito para este producto
+        assert len(items) == 1
+        
+        item_carrito = items[0]
+        cantidad_total_esperada = cantidad_inicial + cantidad_adicional
+        subtotal_total_esperado = cantidad_total_esperada * precio_unitario
+
+        assert item_carrito["cantidad"] == cantidad_total_esperada
+        assert item_carrito["subtotal"] == pytest.approx(subtotal_total_esperado, rel=1e-9)
 

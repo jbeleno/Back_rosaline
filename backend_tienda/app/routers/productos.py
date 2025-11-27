@@ -16,7 +16,7 @@ def get_producto_service(repo=Depends(get_producto_repository)) -> ProductoServi
 @router.post("/", summary="Crear producto", status_code=status.HTTP_201_CREATED, response_model=schemas.Producto)
 def crear_producto(
     producto: schemas.ProductoCreate,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: ProductoService = Depends(get_producto_service)
 ):
     return service.crear_producto(producto)
@@ -40,7 +40,7 @@ def obtener_producto(
 def actualizar_producto(
     producto_id: int,
     producto: schemas.ProductoCreate,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: ProductoService = Depends(get_producto_service)
 ):
     return service.actualizar_producto(producto_id, producto)
@@ -48,7 +48,7 @@ def actualizar_producto(
 @router.delete("/{id}", summary="Eliminar producto")
 def eliminar_producto(
     id: int,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: ProductoService = Depends(get_producto_service)
 ):
     return service.eliminar_producto(id)

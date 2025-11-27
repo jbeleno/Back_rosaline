@@ -5,10 +5,14 @@ Includes the tables for users, clients, categories, products, orders, carts, and
 Main dependency: SQLAlchemy
 """
 
-from sqlalchemy import Column, Integer, String, Text, Numeric, ForeignKey, TIMESTAMP, Computed, CheckConstraint, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, Text, Numeric, ForeignKey, TIMESTAMP, Computed, CheckConstraint, UniqueConstraint, Index, JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from .database import Base
+import os
+
+# Usar JSON genérico para SQLite (pruebas) y JSONB para PostgreSQL (producción)
+JSONType = JSON if os.getenv("DATABASE_URL", "").startswith("sqlite") else JSONB
 
 
 class Usuario(Base):
@@ -149,10 +153,10 @@ class AuditLog(Base):
     usuario_email = Column(String(255), nullable=True)
     ip_address = Column(String(45), nullable=True)
     endpoint = Column(String(255), nullable=True)
-    datos_anteriores = Column(JSONB, nullable=True)
-    datos_nuevos = Column(JSONB, nullable=True)
-    cambios = Column(JSONB, nullable=True)  # Solo campos que cambiaron
+    datos_anteriores = Column(JSONType, nullable=True)
+    datos_nuevos = Column(JSONType, nullable=True)
+    cambios = Column(JSONType, nullable=True)  # Solo campos que cambiaron
     fecha_accion = Column(TIMESTAMP, nullable=False, index=True)
-    metadatos_extra = Column("metadata", JSONB, nullable=True)  # Información adicional (nombre columna DB: metadata)
+    metadatos_extra = Column("metadata", JSONType, nullable=True)  # Información adicional (nombre columna DB: metadata)
     
     usuario = relationship("Usuario", foreign_keys=[usuario_id])

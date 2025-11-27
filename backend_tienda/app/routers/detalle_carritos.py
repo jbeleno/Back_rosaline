@@ -20,7 +20,7 @@ def get_detalle_carrito_service(
 @router.post("/", summary="Crear detalle de carrito", status_code=status.HTTP_201_CREATED, response_model=schemas.DetalleCarrito)
 def crear_detalle_carrito(
     detalle: schemas.DetalleCarritoCreate,
-    current_user: dict = Depends(require_cliente_or_admin),
+    current_user: dict = Depends(require_cliente_or_admin()),
     service: DetalleCarritoService = Depends(get_detalle_carrito_service)
 ):
     return service.crear_detalle_carrito(detalle, current_user)

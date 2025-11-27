@@ -124,9 +124,10 @@ def get_carrito_service(
 def get_detalle_carrito_service(
     repo: DetalleCarritoRepository = Depends(get_detalle_carrito_repository),
     carrito_repo: CarritoRepository = Depends(get_carrito_repository),
-    cliente_repo: ClienteRepository = Depends(get_cliente_repository)
+    cliente_repo: ClienteRepository = Depends(get_cliente_repository),
+    producto_repo: ProductoRepository = Depends(get_producto_repository)
 ) -> DetalleCarritoService:
-    return DetalleCarritoService(repo, carrito_repo, cliente_repo)
+    return DetalleCarritoService(repo, carrito_repo, cliente_repo, producto_repo)
 
 def get_audit_log_service(repo: AuditLogRepository = Depends(get_audit_log_repository)) -> AuditLogService:
     return AuditLogService(repo)

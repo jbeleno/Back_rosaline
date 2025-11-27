@@ -25,7 +25,7 @@ def listar_usuarios(
     rol: Optional[str] = Query(None),
     correo: Optional[str] = Query(None),
     email_verificado: Optional[str] = Query(None),
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: UsuarioService = Depends(get_usuario_service)
 ):
     return service.listar_usuarios(skip, limit, rol, correo, email_verificado)
@@ -37,7 +37,7 @@ def leer_usuarios_me(current_user: dict = Depends(get_current_user)):
 @router.get("/{usuario_id}", summary="Obtener usuario por ID", response_model=schemas.Usuario)
 def obtener_usuario(
     usuario_id: int = Path(..., ge=1),
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: UsuarioService = Depends(get_usuario_service)
 ):
     return service.obtener_usuario(usuario_id)
@@ -46,7 +46,7 @@ def obtener_usuario(
 def actualizar_usuario(
     usuario_id: int,
     usuario: schemas.UsuarioUpdate,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: UsuarioService = Depends(get_usuario_service)
 ):
     return service.actualizar_usuario(usuario_id, usuario, current_user)
@@ -54,7 +54,7 @@ def actualizar_usuario(
 @router.delete("/{usuario_id}", summary="Eliminar usuario", response_model=schemas.Usuario)
 def eliminar_usuario(
     usuario_id: int,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: UsuarioService = Depends(get_usuario_service)
 ):
     return service.eliminar_usuario(usuario_id, current_user)

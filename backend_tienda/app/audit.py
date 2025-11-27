@@ -3,7 +3,7 @@ Sistema de auditoría usando SQLAlchemy event listeners.
 Captura información del contexto (usuario, IP, endpoint) y actualiza los registros creados por triggers.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import event, text
 from . import models
 
@@ -98,7 +98,7 @@ def update_audit_log(connection, instance, operation: str):
                     WHERE tabla_nombre = :tabla_nombre
                         AND registro_id = :registro_id
                         AND accion = :accion
-                        AND fecha_accion > NOW() - INTERVAL '2 seconds'
+                        AND fecha_accion > :threshold
                     ORDER BY fecha_accion DESC
                     LIMIT 1
                 )
@@ -110,7 +110,8 @@ def update_audit_log(connection, instance, operation: str):
                 'endpoint': endpoint,
                 'tabla_nombre': tabla_nombre,
                 'registro_id': registro_id,
-                'accion': operation
+                'accion': operation,
+                'threshold': (datetime.utcnow() - timedelta(seconds=2)).strftime('%Y-%m-%d %H:%M:%S')
             }
         )
         # NO hacer commit aquí - dejar que la transacción principal lo maneje

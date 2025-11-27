@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends, status
 from typing import List
 from .. import schemas
 from ..services.pedido_service import PedidoService
-from ..core.dependencies import get_pedido_repository, get_cliente_repository
+from ..core.dependencies import get_pedido_repository, get_cliente_repository, get_detalle_pedido_service
 from ..auth import get_current_user, require_admin, require_cliente_or_admin
 from ..services.detalle_pedido_service import DetallePedidoService
-from ..core.dependencies import get_detalle_pedido_repository
 
 router = APIRouter(
     prefix="/pedidos",
@@ -21,7 +20,7 @@ def get_pedido_service(
 @router.post("/", summary="Crear pedido", status_code=status.HTTP_201_CREATED, response_model=schemas.Pedido)
 def crear_pedido(
     pedido: schemas.PedidoCreate,
-    current_user: dict = Depends(require_cliente_or_admin),
+    current_user: dict = Depends(require_cliente_or_admin()),
     service: PedidoService = Depends(get_pedido_service)
 ):
     return service.crear_pedido(pedido, current_user)
@@ -55,7 +54,7 @@ def actualizar_pedido(
 @router.delete("/{pedido_id}", summary="Eliminar pedido", response_model=schemas.Pedido)
 def eliminar_pedido(
     pedido_id: int,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: PedidoService = Depends(get_pedido_service)
 ):
     return service.eliminar_pedido(pedido_id)

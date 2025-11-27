@@ -23,7 +23,7 @@ class TestClienteEndpoints:
             headers=get_auth_headers(token_test)
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert data["nombre"] == "María"
         assert data["apellido"] == "González"
@@ -85,7 +85,7 @@ class TestPedidoEndpoints:
             headers=get_auth_headers(token_test)
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert data["estado"] == "pendiente"
         assert "id_pedido" in data
@@ -170,7 +170,7 @@ class TestDetallePedidoEndpoints:
             headers=get_auth_headers(token_test)
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert data["cantidad"] == 5
         assert "subtotal" in data
@@ -293,4 +293,55 @@ class TestDetallePedidoEndpoints:
         data = response.json()
         assert isinstance(data, list)
         assert len(data) >= 1
+
+    def test_calculo_total_pedido_con_varios_productos(self, client, cliente_test, categoria_test, token_test, token_admin_test):
+        """CP-013: Verifica que el total del pedido se calcula correctamente con múltiples productos."""
+        # 1. Crear dos productos distintos
+        producto1_res = client.post("/productos/", headers=get_auth_headers(token_admin_test), json={
+            "id_categoria": categoria_test.id_categoria, "nombre": "Producto A", "descripcion": "Desc A",
+            "cantidad": 100, "precio": 10.50, "estado": "activo"
+        })
+        assert producto1_res.status_code == 201
+        producto1 = producto1_res.json()
+
+        producto2_res = client.post("/productos/", headers=get_auth_headers(token_admin_test), json={
+            "id_categoria": categoria_test.id_categoria, "nombre": "Producto B", "descripcion": "Desc B",
+            "cantidad": 100, "precio": 5.25, "estado": "activo"
+        })
+        assert producto2_res.status_code == 201
+        producto2 = producto2_res.json()
+
+        # 2. Crear un pedido
+        pedido_res = client.post("/pedidos/", headers=get_auth_headers(token_test), json={
+            "id_cliente": cliente_test.id_cliente, "estado": "pendiente",
+            "direccion_envio": "Calle Falsa 123", "metodo_pago": "Tarjeta"
+        })
+        assert pedido_res.status_code == 201
+        pedido_id = pedido_res.json()["id_pedido"]
+
+        # 3. Añadir ambos productos al pedido
+        # Item 1: 3 unidades del Producto A
+        subtotal1 = 3 * producto1["precio"]
+        client.post("/detalle_pedidos/", headers=get_auth_headers(token_test), json={
+            "id_pedido": pedido_id, "id_producto": producto1["id_producto"],
+            "cantidad": 3, "precio_unitario": producto1["precio"]
+        })
+
+        # Item 2: 2 unidades del Producto B
+        subtotal2 = 2 * producto2["precio"]
+        client.post("/detalle_pedidos/", headers=get_auth_headers(token_test), json={
+            "id_pedido": pedido_id, "id_producto": producto2["id_producto"],
+            "cantidad": 2, "precio_unitario": producto2["precio"]
+        })
+
+        # 4. Obtener el pedido y verificar el total
+        response_pedido = client.get(f"/pedidos/{pedido_id}", headers=get_auth_headers(token_test))
+        assert response_pedido.status_code == 200
+        pedido_actualizado = response_pedido.json()
+
+        total_esperado = subtotal1 + subtotal2
+        
+        # Asumiendo que el campo se llama 'total' en el modelo Pedido
+        assert "total" in pedido_actualizado
+        assert pedido_actualizado["total"] == pytest.approx(total_esperado, rel=1e-9)
 

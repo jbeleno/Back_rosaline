@@ -36,7 +36,7 @@ class TestLogin:
         )
         
         assert response.status_code == 401
-        assert "Credenciales incorrectas" in response.json()["detail"]
+        assert "Correo o contraseña incorrectos" in response.json()["detail"]
     
     def test_login_contraseña_incorrecta(self, client, usuario_test):
         """Prueba login con contraseña incorrecta."""
@@ -49,7 +49,7 @@ class TestLogin:
         )
         
         assert response.status_code == 401
-        assert "Credenciales incorrectas" in response.json()["detail"]
+        assert "Correo o contraseña incorrectos" in response.json()["detail"]
     
     def test_login_datos_faltantes(self, client):
         """Prueba login con datos faltantes."""
@@ -78,7 +78,7 @@ class TestUsuarioEndpoints:
             }
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert data["correo"] == "nuevo@example.com"
         assert data["rol"] == "cliente"

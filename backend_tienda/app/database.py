@@ -33,14 +33,22 @@ pool_timeout = int(os.getenv("DB_POOL_TIMEOUT", "30"))
 pool_recycle = int(os.getenv("DB_POOL_RECYCLE", "3600"))  # Reciclar conexiones cada hora
 
 # Crear engine con configuración de pool optimizada para Aurora
+engine_options = {
+    "pool_pre_ping": True,
+    "echo": False
+}
+
+if SQLALCHEMY_DATABASE_URL.startswith("postgresql"):
+    engine_options.update({
+        "pool_size": 10,
+        "max_overflow": 5,
+        "pool_timeout": 30,
+        "pool_recycle": 3600,
+    })
+
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    pool_size=10, # You can make these configurable in Settings too if needed
-    max_overflow=5,
-    pool_timeout=30,
-    pool_recycle=3600,
-    pool_pre_ping=True,
-    echo=False
+    **engine_options
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

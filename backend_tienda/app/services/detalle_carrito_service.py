@@ -4,13 +4,21 @@ from typing import Optional
 from ..repositories.detalle_carrito_repository import DetalleCarritoRepository
 from ..repositories.carrito_repository import CarritoRepository
 from ..repositories.cliente_repository import ClienteRepository
+from ..repositories.producto_repository import ProductoRepository # Importar
 from .. import schemas
 
 class DetalleCarritoService:
-    def __init__(self, detalle_carrito_repository: DetalleCarritoRepository, carrito_repository: CarritoRepository, cliente_repository: ClienteRepository):
+    def __init__(
+        self, 
+        detalle_carrito_repository: DetalleCarritoRepository, 
+        carrito_repository: CarritoRepository, 
+        cliente_repository: ClienteRepository,
+        producto_repository: ProductoRepository  # Añadir
+    ):
         self.detalle_carrito_repository = detalle_carrito_repository
         self.carrito_repository = carrito_repository
         self.cliente_repository = cliente_repository
+        self.producto_repository = producto_repository # Añadir
 
     def _validar_permiso_carrito(self, carrito_id: int, current_user: dict):
         user_id = current_user.get("id_usuario")
@@ -30,7 +38,31 @@ class DetalleCarritoService:
 
     def crear_detalle_carrito(self, detalle: schemas.DetalleCarritoCreate, current_user: dict):
         self._validar_permiso_carrito(detalle.id_carrito, current_user)
-        return self.detalle_carrito_repository.create(detalle)
+
+        # 1. Validar stock del producto
+        producto = self.producto_repository.get(detalle.id_producto)
+        if not producto:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
+        if producto.cantidad < detalle.cantidad:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No hay suficiente inventario para este producto")
+
+        # 2. Buscar si el producto ya está en el carrito
+        item_existente = self.detalle_carrito_repository.get_by_carrito_and_producto(
+            carrito_id=detalle.id_carrito, 
+            producto_id=detalle.id_producto
+        )
+
+        if item_existente:
+            # 3. Si existe, actualizar la cantidad
+            nueva_cantidad = item_existente.cantidad + detalle.cantidad
+            if producto.cantidad < nueva_cantidad:
+                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La cantidad total supera el inventario disponible")
+            
+            update_data = schemas.DetalleCarritoUpdate(cantidad=nueva_cantidad)
+            return self.detalle_carrito_repository.update(item_existente.id_detalle_carrito, update_data)
+        else:
+            # 4. Si no existe, crear el nuevo detalle
+            return self.detalle_carrito_repository.create(detalle)
 
     def listar_detalles_carrito(self, skip: int, limit: int, carrito_id: Optional[int], current_user: dict):
         user_id = current_user.get("id_usuario")

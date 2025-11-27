@@ -17,6 +17,9 @@ class ProductoRepository(Repository):
     def get_by_id(self, producto_id: int) -> Optional[models.Producto]:
         return self.session.query(models.Producto).options(joinedload(models.Producto.categoria)).filter(models.Producto.id_producto == producto_id).first()
 
+    def get_by_nombre(self, nombre: str) -> Optional[models.Producto]:
+        return self.session.query(models.Producto).filter(models.Producto.nombre == nombre).first()
+
     def get_by_categoria_id(self, categoria_id: int, skip: int = 0, limit: int = 100) -> List[models.Producto]:
         return self.session.query(models.Producto).filter(models.Producto.id_categoria == categoria_id).offset(skip).limit(limit).all()
 

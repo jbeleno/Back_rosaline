@@ -6,9 +6,23 @@ Main dependencies: Pydantic, typing, datetime
 """
 
 from pydantic import BaseModel, EmailStr, Field, validator, constr
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+
+class AuditLogCreate(BaseModel):
+    tabla_nombre: str
+    registro_id: int
+    accion: str
+    usuario_id: Optional[int] = None
+    usuario_email: Optional[EmailStr] = None
+    ip_address: Optional[str] = None
+    endpoint: Optional[str] = None
+    datos_anteriores: Optional[Dict[str, Any]] = None
+    datos_nuevos: Optional[Dict[str, Any]] = None
+    cambios: Optional[Dict[str, Any]] = None
+    fecha_accion: datetime = Field(default_factory=datetime.utcnow)
+    metadatos_extra: Optional[Dict[str, Any]] = None
 
 class UsuarioBase(BaseModel):
     correo: EmailStr = Field(..., description="Correo electrónico del usuario")
@@ -318,6 +332,38 @@ class PedidoCreate(PedidoBase):
                 "metodo_pago": "PayPal"
             }
         }
+
+class PedidoUpdate(BaseModel):
+    estado: Optional[str] = None
+    direccion_envio: Optional[constr(min_length=5, max_length=500, strip_whitespace=True)] = None
+    metodo_pago: Optional[str] = None
+    
+    @validator('estado')
+    def validar_estado(cls, v):
+        if v is None:
+            return v
+        estados_validos = ["pendiente", "Pago confirmado", "En preparación", 
+                          "En domicilio", "Listo para recoger", "Entregado"]
+        if v not in estados_validos:
+            raise ValueError(f'El estado debe ser uno de: {", ".join(estados_validos)}')
+        return v
+    
+    @validator('direccion_envio')
+    def validar_direccion(cls, v):
+        if v is None:
+            return v
+        if not v or len(v.strip()) < 5:
+            raise ValueError('La dirección de envío debe tener al menos 5 caracteres')
+        return v.strip()
+    
+    @validator('metodo_pago')
+    def validar_metodo_pago(cls, v):
+        if v is None:
+            return v
+        metodos_validos = ["PayPal", "Tarjeta", "Efectivo"]
+        if v not in metodos_validos:
+            raise ValueError(f'El método de pago debe ser uno de: {", ".join(metodos_validos)}')
+        return v
 
 class Pedido(PedidoBase):
     id_pedido: int

@@ -74,7 +74,7 @@ class DetallePedidoService:
 
     def listar_productos_por_pedido(self, pedido_id: int, current_user: dict) -> List[models.Producto]:
         # Security check is implicitly handled by get_pedido
-        self.get_pedido(pedido_id, current_user) 
+        self._validar_permiso_pedido(pedido_id, current_user) 
         return self.detalle_pedido_repository.get_productos_by_pedido_id(pedido_id)
 
     def productos_de_pedido(self, pedido_id: int, current_user: dict):

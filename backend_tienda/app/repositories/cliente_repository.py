@@ -25,7 +25,7 @@ class ClienteRepository(Repository):
     def list(self, skip: int = 0, limit: int = 100) -> List[models.Cliente]:
         return self.session.query(models.Cliente).options(joinedload(models.Cliente.usuario)).offset(skip).limit(limit).all()
 
-    def create(self, cliente: schemas.ClienteCreate, usuario_id: int) -> models.Cliente:
+    def create(self, cliente: schemas.ClienteCreate) -> models.Cliente:
         return crud.crear_cliente(self.session, cliente)
 
     def get(self, cliente_id: int) -> Optional[models.Cliente]:

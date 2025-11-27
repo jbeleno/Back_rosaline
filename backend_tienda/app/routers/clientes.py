@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from typing import List
 from .. import schemas
 from ..services.cliente_service import ClienteService
-from ..core.dependencies import get_cliente_repository
+from ..core.dependencies import get_cliente_repository, get_pedido_service, get_carrito_service
 from ..auth import get_current_user, require_admin, require_cliente_or_admin
 from ..services.pedido_service import PedidoService
 from ..services.carrito_service import CarritoService
@@ -18,7 +18,7 @@ def get_cliente_service(repo=Depends(get_cliente_repository)) -> ClienteService:
 @router.post("/", summary="Crear cliente", status_code=status.HTTP_201_CREATED, response_model=schemas.Cliente)
 def crear_cliente(
     cliente: schemas.ClienteCreate,
-    current_user: dict = Depends(require_cliente_or_admin),
+    current_user: dict = Depends(require_cliente_or_admin()),
     service: ClienteService = Depends(get_cliente_service)
 ):
     return service.crear_cliente(cliente, current_user)
@@ -27,7 +27,7 @@ def crear_cliente(
 def listar_clientes(
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: ClienteService = Depends(get_cliente_service)
 ):
     return service.listar_clientes(skip, limit)
@@ -95,7 +95,7 @@ def actualizar_cliente(
 @router.delete("/{cliente_id}", summary="Eliminar cliente", response_model=schemas.Cliente)
 def eliminar_cliente(
     cliente_id: int,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: ClienteService = Depends(get_cliente_service)
 ):
     return service.eliminar_cliente(cliente_id)

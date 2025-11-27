@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from typing import List
 from .. import schemas
 from ..services.carrito_service import CarritoService
-from ..core.dependencies import get_carrito_repository, get_cliente_repository
+from ..core.dependencies import get_carrito_repository, get_cliente_repository, get_detalle_carrito_service
 from ..auth import get_current_user, require_admin, require_cliente_or_admin
 from ..services.detalle_carrito_service import DetalleCarritoService
 
@@ -20,7 +20,7 @@ def get_carrito_service(
 @router.post("/", summary="Crear carrito", status_code=status.HTTP_201_CREATED, response_model=schemas.Carrito)
 def crear_carrito(
     carrito: schemas.CarritoCreate,
-    current_user: dict = Depends(require_cliente_or_admin),
+    current_user: dict = Depends(require_cliente_or_admin()),
     service: CarritoService = Depends(get_carrito_service)
 ):
     return service.crear_carrito(carrito, current_user)
@@ -29,7 +29,7 @@ def crear_carrito(
 def listar_carritos(
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: CarritoService = Depends(get_carrito_service)
 ):
     return service.listar_carritos(skip, limit)

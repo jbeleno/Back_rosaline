@@ -35,6 +35,8 @@ def obtener_historial_registro(
     skip: int = 0,
     limit: int = 100,
     current_user: dict = Depends(require_admin),
-    service: AuditLogService = Depends(get_audit_log_service)
+    db: Session = Depends(get_db)
 ):
-    return service.obtener_historial_registro(tabla_nombre, registro_id, skip, limit)
+    return crud.get_audit_logs(
+        db, skip, limit, tabla_nombre, registro_id, None, None, None, None
+    )

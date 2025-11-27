@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from typing import List
 from .. import schemas
 from ..services.categoria_service import CategoriaService
-from ..core.dependencies import get_categoria_repository
+from ..core.dependencies import get_categoria_repository, get_producto_service
 from ..auth import require_admin
 from ..services.producto_service import ProductoService
 
@@ -17,7 +17,7 @@ def get_categoria_service(repo=Depends(get_categoria_repository)) -> CategoriaSe
 @router.post("/", summary="Crear categoría", status_code=status.HTTP_201_CREATED, response_model=schemas.Categoria)
 def crear_categoria(
     categoria: schemas.CategoriaCreate,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: CategoriaService = Depends(get_categoria_service)
 ):
     return service.crear_categoria(categoria)
@@ -50,7 +50,7 @@ def obtener_productos_de_categoria(
 def actualizar_categoria(
     categoria_id: int,
     categoria: schemas.CategoriaCreate,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: CategoriaService = Depends(get_categoria_service)
 ):
     return service.actualizar_categoria(categoria_id, categoria)
@@ -58,7 +58,7 @@ def actualizar_categoria(
 @router.delete("/{categoria_id}", summary="Eliminar categoría", response_model=schemas.Categoria)
 def eliminar_categoria(
     categoria_id: int,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_admin()),
     service: CategoriaService = Depends(get_categoria_service)
 ):
     return service.eliminar_categoria(categoria_id)

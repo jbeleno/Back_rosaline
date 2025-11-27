@@ -22,7 +22,7 @@ class TestCategoriaEndpoints:
             headers=get_auth_headers(token_admin_test)
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert data["nombre"] == "Ropa"
         assert "id_categoria" in data
@@ -64,7 +64,7 @@ class TestProductoEndpoints:
             headers=get_auth_headers(token_admin_test)
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
         assert data["nombre"] == "Laptop"
         assert data["precio"] == 1299.99
@@ -101,7 +101,7 @@ class TestProductoEndpoints:
             headers=get_auth_headers(token_admin_test)
         )
         
-        assert response.status_code == 400
+        assert response.status_code == 422
     
     def test_listar_productos(self, client, producto_test):
         """Prueba listar productos."""
@@ -150,4 +150,51 @@ class TestProductoEndpoints:
         )
         
         assert response.status_code == 404
+
+    def test_agregar_producto_identico_suma_stock(self, client, categoria_test, token_admin_test):
+        """CP-015: Prueba que agregar un producto idéntico suma el stock."""
+        # 1. Crear el producto inicial
+        nombre_producto = "Torta de Fresa Única"
+        cantidad_inicial = 10
+        producto_data = {
+            "id_categoria": categoria_test.id_categoria,
+            "nombre": nombre_producto,
+            "descripcion": "Torta de fresa para probar stock",
+            "cantidad": cantidad_inicial,
+            "precio": 25.00,
+            "estado": "activo"
+        }
+        response1 = client.post(
+            "/productos/",
+            json=producto_data,
+            headers=get_auth_headers(token_admin_test)
+        )
+        assert response1.status_code == 201
+        producto_creado = response1.json()
+        id_producto = producto_creado["id_producto"]
+
+        # 2. Agregar el mismo producto (idéntico) con una cantidad adicional
+        cantidad_adicional = 5
+        producto_data["cantidad"] = cantidad_adicional
+        
+        response2 = client.post(
+            "/productos/",
+            json=producto_data,
+            headers=get_auth_headers(token_admin_test)
+        )
+        # El endpoint debería identificar el producto y sumar el stock, devolviendo 200 OK
+        assert response2.status_code == 200
+
+        # 3. Verificar que el stock se ha sumado correctamente
+        response_final = client.get(f"/productos/{id_producto}")
+        assert response_final.status_code == 200
+        producto_actualizado = response_final.json()
+        
+        cantidad_total_esperada = cantidad_inicial + cantidad_adicional
+        assert producto_actualizado["cantidad"] == cantidad_total_esperada
+
+        # 4. Verificar que no se creó un producto nuevo
+        response_busqueda = client.get(f"/productos/?nombre={nombre_producto}")
+        productos_encontrados = response_busqueda.json()
+        assert len(productos_encontrados) == 1
 
