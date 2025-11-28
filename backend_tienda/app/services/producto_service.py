@@ -53,7 +53,7 @@ class ProductoService:
         db_producto = self.producto_repository.delete(producto_id)
         if not db_producto:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
-        return {"mensaje": "Producto eliminado correctamente"}
+        return db_producto
     
     def productos_de_categoria(self, categoria_id: int):
         return self.producto_repository.get_by_categoria(categoria_id)
