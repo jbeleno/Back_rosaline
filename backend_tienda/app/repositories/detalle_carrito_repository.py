@@ -39,11 +39,18 @@ class DetalleCarritoRepository(Repository):
     def list_by_carrito_ids(self, carrito_ids: List[int], skip: int = 0, limit: int = 100) -> List[models.DetalleCarrito]:
         return self.session.query(models.DetalleCarrito).filter(models.DetalleCarrito.id_carrito.in_(carrito_ids)).offset(skip).limit(limit).all()
 
-    def update(self, detalle_id: int, detalle_update: schemas.DetalleCarritoCreate) -> Optional[models.DetalleCarrito]:
+    def update(self, detalle_id: int, detalle_update: schemas.DetalleCarritoUpdate) -> Optional[models.DetalleCarrito]:
         db_detalle = self.get(detalle_id)
         if db_detalle:
-            for key, value in detalle_update.model_dump().items():
+            # Actualizar solo los campos del schema de actualización
+            update_data = detalle_update.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
                 setattr(db_detalle, key, value)
+            
+            # Recalcular subtotal si la cantidad cambia
+            if 'cantidad' in update_data:
+                db_detalle.subtotal = db_detalle.cantidad * db_detalle.precio_unitario
+
             self.commit()
             self.refresh(db_detalle)
         return db_detalle

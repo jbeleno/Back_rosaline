@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from typing import List, Optional
 from .. import schemas
 from ..services.detalle_carrito_service import DetalleCarritoService
-from ..core.dependencies import get_detalle_carrito_repository, get_carrito_repository, get_cliente_repository
+from ..core.dependencies import get_detalle_carrito_repository, get_carrito_repository, get_cliente_repository, get_producto_repository
 from ..auth import get_current_user, require_cliente_or_admin
 
 router = APIRouter(
@@ -13,9 +13,10 @@ router = APIRouter(
 def get_detalle_carrito_service(
     repo=Depends(get_detalle_carrito_repository),
     carrito_repo=Depends(get_carrito_repository),
-    cliente_repo=Depends(get_cliente_repository)
+    cliente_repo=Depends(get_cliente_repository),
+    producto_repo=Depends(get_producto_repository)
 ) -> DetalleCarritoService:
-    return DetalleCarritoService(repo, carrito_repo, cliente_repo)
+    return DetalleCarritoService(repo, carrito_repo, cliente_repo, producto_repo)
 
 @router.post("/", summary="Crear detalle de carrito", status_code=status.HTTP_201_CREATED, response_model=schemas.DetalleCarrito)
 def crear_detalle_carrito(

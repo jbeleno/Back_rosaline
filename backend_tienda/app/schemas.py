@@ -276,6 +276,31 @@ class ProductoCreate(ProductoBase):
             }
         }
 
+class ProductoUpdate(BaseModel):
+    id_categoria: Optional[int] = Field(None, gt=0, description="ID de la categoría")
+    nombre: Optional[constr(min_length=1, max_length=255, strip_whitespace=True)] = None
+    descripcion: Optional[constr(min_length=1, max_length=2000)] = None
+    cantidad: Optional[int] = Field(None, ge=0, description="Cantidad en inventario")
+    precio: Optional[float] = Field(None, gt=0, le=999999.99, description="Precio del producto")
+    imagen_url: Optional[constr(max_length=500)] = None
+    estado: Optional[str] = Field(None, pattern="^(activo|inactivo)$")
+
+    @validator('precio')
+    def validar_precio(cls, v):
+        if v is not None:
+            if v <= 0:
+                raise ValueError('El precio debe ser mayor a 0')
+            if v > 999999.99:
+                raise ValueError('El precio no puede exceder 999,999.99')
+            return round(v, 2)
+        return v
+
+    @validator('cantidad')
+    def validar_cantidad(cls, v):
+        if v is not None and v < 0:
+            raise ValueError('La cantidad no puede ser negativa')
+        return v
+
 class Producto(ProductoBase):
     id_producto: int
     categoria: Categoria
@@ -368,6 +393,7 @@ class PedidoUpdate(BaseModel):
 class Pedido(PedidoBase):
     id_pedido: int
     fecha_pedido: datetime
+    total: float = Field(description="Total calculado del pedido")
     cliente: Cliente
     class Config:
         from_attributes = True
@@ -498,6 +524,15 @@ class DetalleCarrito(DetalleCarritoBase):
     producto: Producto
     class Config:
         from_attributes = True
+
+class DetalleCarritoUpdate(BaseModel):
+    cantidad: Optional[int] = Field(None, gt=0, le=1000, description="Nueva cantidad del producto")
+
+    @validator('cantidad')
+    def validar_cantidad(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError('La cantidad debe ser mayor a 0')
+        return v
 
 class AuditLogBase(BaseModel):
     tabla_nombre: str

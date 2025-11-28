@@ -58,7 +58,17 @@ class DetalleCarritoService:
             if producto.cantidad < nueva_cantidad:
                  raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La cantidad total supera el inventario disponible")
             
-            update_data = schemas.DetalleCarritoUpdate(cantidad=nueva_cantidad)
+            # Asegurarse de que el subtotal se calcula correctamente
+            nuevo_subtotal = nueva_cantidad * item_existente.precio_unitario
+
+            # Crear un diccionario solo con los campos a actualizar
+            update_data_dict = {
+                "cantidad": nueva_cantidad,
+                "subtotal": nuevo_subtotal
+            }
+            # Crear el objeto Pydantic a partir del diccionario
+            update_data = schemas.DetalleCarritoUpdate(**update_data_dict)
+            
             return self.detalle_carrito_repository.update(item_existente.id_detalle_carrito, update_data)
         else:
             # 4. Si no existe, crear el nuevo detalle

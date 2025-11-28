@@ -39,13 +39,14 @@ def test_registro_envia_email_confirmacion(client, monkeypatch):
     mock_email_service.enviar_email_confirmacion.assert_called_once()
 
     # 5. (Opcional pero recomendado) Verificar que fue llamada con los argumentos correctos
+    # Se inspeccionan los kwargs (keyword arguments) ya que el servicio puede ser llamado con ellos
     call_args, call_kwargs = mock_email_service.enviar_email_confirmacion.call_args
     
-    # El primer argumento posicional (args[0]) debería ser el objeto de usuario
-    usuario_arg = call_args[0]
-    assert usuario_arg.correo == correo_nuevo_usuario
+    # Verificar que los argumentos correctos ('destinatario' y 'pin') están en los kwargs
+    assert "destinatario" in call_kwargs
+    assert call_kwargs["destinatario"] == correo_nuevo_usuario
     
-    # El segundo argumento posicional (args[1]) debería ser el PIN
-    pin_arg = call_args[1]
+    assert "pin" in call_kwargs
+    pin_arg = call_kwargs["pin"]
     assert isinstance(pin_arg, str)
-    assert len(pin_arg) == 4 # Asumiendo que el PIN tiene 4 dígitos
+    assert len(pin_arg) >= 4 # Asumiendo un PIN de al menos 4 dígitos

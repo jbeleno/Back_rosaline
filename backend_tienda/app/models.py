@@ -84,7 +84,12 @@ class Pedido(Base):
     fecha_pedido = Column(TIMESTAMP, index=True)
     metodo_pago = Column(String(50), default="PayPal")
     cliente = relationship("Cliente")
-    
+    detalles = relationship("DetallePedido", back_populates="pedido")
+
+    @property
+    def total(self):
+        return sum(detalle.subtotal for detalle in self.detalles) if self.detalles else 0.0
+
     __table_args__ = (
         CheckConstraint("estado IN ('pendiente', 'Pago confirmado', 'En preparación', 'En domicilio', 'Listo para recoger', 'Entregado')", name="check_pedido_estado"),
         CheckConstraint("metodo_pago IN ('PayPal', 'Tarjeta', 'Efectivo')", name="check_metodo_pago"),

@@ -10,13 +10,21 @@ class ProductoService:
         self.producto_repository = producto_repository
 
     def crear_producto(self, producto: schemas.ProductoCreate):
-        # Verificar si ya existe un producto con el mismo nombre
+    # Verificar si ya existe un producto con el mismo nombre
         producto_existente = self.producto_repository.get_by_nombre(producto.nombre)
-        
+    
         if producto_existente:
             # Si existe, sumar la cantidad al stock actual
             stock_actualizado = producto_existente.cantidad + producto.cantidad
-            update_data = schemas.ProductoUpdate(cantidad=stock_actualizado)
+            update_data = schemas.ProductoCreate(
+                id_categoria=producto_existente.id_categoria,
+                nombre=producto_existente.nombre,
+                descripcion=producto_existente.descripcion,
+                cantidad=stock_actualizado,
+                precio=producto_existente.precio,
+                imagen_url=producto_existente.imagen_url,
+                estado=producto_existente.estado
+            )
             return self.producto_repository.update(producto_existente.id_producto, update_data)
         else:
             # Si no existe, crear un nuevo producto

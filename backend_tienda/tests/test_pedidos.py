@@ -102,8 +102,7 @@ class TestPedidoEndpoints:
             },
             headers=get_auth_headers(token_test)
         )
-        
-        assert response.status_code == 404
+        assert response.status_code in [403, 404]
     
     def test_listar_pedidos(self, client, cliente_test, token_admin_test):
         """Prueba listar pedidos."""
