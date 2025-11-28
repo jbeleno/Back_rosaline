@@ -132,15 +132,27 @@ class TestProductoEndpoints:
         assert data["nombre"] == "Producto Actualizado"
         assert data["precio"] == 899.99
     
-    def test_eliminar_producto_exitoso(self, client, producto_test, token_admin_test):
-        """Prueba eliminar producto exitosamente."""
+    def test_eliminacion_logica_de_producto(self, client, producto_test, token_admin_test):
+        """CP-014: Prueba la eliminación lógica de un producto."""
+        # 1. Eliminar el producto
         response = client.delete(
             f"/productos/{producto_test.id_producto}",
             headers=get_auth_headers(token_admin_test)
         )
         
         assert response.status_code == 200
-        assert "eliminado" in response.json()["mensaje"].lower()
+        data = response.json()
+        assert data["id_producto"] == producto_test.id_producto
+        assert data["estado"] == "inactivo"
+
+        # 2. Verificar que el producto sigue en la BD pero con estado inactivo
+        response_get = client.get(
+            f"/productos/{producto_test.id_producto}",
+            headers=get_auth_headers(token_admin_test)
+        )
+        assert response_get.status_code == 200
+        producto_obtenido = response_get.json()
+        assert producto_obtenido["estado"] == "inactivo"
     
     def test_eliminar_producto_no_existe(self, client, token_admin_test):
         """Prueba eliminar producto inexistente."""

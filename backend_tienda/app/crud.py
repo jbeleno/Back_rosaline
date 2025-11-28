@@ -546,55 +546,23 @@ def actualizar_producto(db: Session, producto_id: int, producto: schemas.Product
 
 def eliminar_producto(db: Session, producto_id: int):
     """
-    Elimina un producto de la base de datos.
-    
-    Carga la relación con Categoria antes de eliminar para evitar errores
-    de serialización después del commit.
+    Realiza una eliminación lógica de un producto, cambiando su estado a 'inactivo'.
     
     Args:
         db (Session): Database session.
-        producto_id (int): ID del producto a eliminar.
+        producto_id (int): ID del producto a eliminar lógicamente.
     
     Returns:
-        models.Producto | None: Producto eliminado o None si no existe.
-    
-    Raises:
-        HTTPException: Si hay un error al eliminar el producto.
+        models.Producto | None: Producto actualizado o None si no existe.
     """
-    try:
-        from sqlalchemy.orm import joinedload
-        
-        # Cargar el producto con la relación categoria ANTES de eliminar
-        # Esto es necesario porque el schema Producto requiere el objeto Categoria completo
-        db_producto = db.query(models.Producto)\
-            .options(joinedload(models.Producto.categoria))\
-            .filter(models.Producto.id_producto == producto_id)\
-            .first()
-        
-        if not db_producto:
-            return None
-        
-        # Separar el objeto de la sesión antes de eliminarlo
-        # Esto mantiene los datos en memoria para la serialización
-        db.expunge(db_producto)
-        
-        # Ahora eliminamos el producto
-        db_producto_to_delete = db.query(models.Producto)\
-            .filter(models.Producto.id_producto == producto_id)\
-            .first()
-        
-        if db_producto_to_delete:
-            db.delete(db_producto_to_delete)
-            db.commit()
-        
-        # Retornar el objeto expunged que tiene todos los datos en memoria
-        return db_producto
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al eliminar producto: {str(e)}"
-        )
+    db_producto = get_producto(db, producto_id)
+    if not db_producto:
+        return None
+    
+    db_producto.estado = "inactivo"
+    db.commit()
+    db.refresh(db_producto)
+    return db_producto
 
 def get_pedido(db: Session, pedido_id: int):
     return db.query(models.Pedido).filter(models.Pedido.id_pedido == pedido_id).first()
